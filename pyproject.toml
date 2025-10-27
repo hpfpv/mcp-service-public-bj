@@ -1,0 +1,74 @@
+[build-system]
+requires = ["hatchling>=1.21.1"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-service-public-bj"
+version = "0.1.0"
+description = "MCP server exposing Benin public service information via live scraping of service-public.bj."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "MCP Service Public BJ Maintainers" }
+]
+dependencies = [
+  "scrapy>=2.11.1",
+  "httpx[http2]>=0.26.0",
+  "pydantic>=2.6.0",
+  "pydantic-settings>=2.2.1",
+  "parsel>=1.9.1",
+  "tenacity>=8.2.3",
+  "structlog>=23.2.0",
+  "aiocache>=0.12.2",
+  "orjson>=3.9.15",
+  "rapidfuzz>=3.14.0",
+  "mcp>=1.19.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "black>=24.4.2",
+  "mypy>=1.9.0",
+  "ruff>=0.3.5",
+  "pytest>=8.0.0",
+  "pytest-asyncio>=0.23.6",
+  "respx>=0.20.2",
+  "pytest-cov>=4.1.0",
+  "types-requests>=2.31.0.20240311"
+]
+
+[tool.hatch.build]
+packages = ["src/server"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+skip-string-normalization = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "N", "RUF", "UP", "ASYNC", "S"]
+ignore = ["E501"]
+src = ["src", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+plugins = ["pydantic.mypy"]
+mypy_path = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = [
+  "--color=yes",
+  "--maxfail=1",
+  "--strict-markers",
+  "--disable-warnings"
+]
+testpaths = ["tests"]

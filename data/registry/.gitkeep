@@ -1,0 +1,3 @@
+This directory stores the MCP server’s persisted registry snapshots. Because the
+snapshots are generated at runtime (e.g., `registry.json`), we track the folder
+with this placeholder so version control keeps the location on new clones.
