@@ -72,3 +72,6 @@ addopts = [
   "--disable-warnings"
 ]
 testpaths = ["tests"]
+
+[project.scripts]
+mcp-service-public-bj = "server.cli:main"

@@ -35,6 +35,43 @@ pytest
 pre-commit run --all-files
 ```
 
+## Command Line Helpers
+Install the project in editable mode (or install the wheel), then use the CLI entry point:
+
+```bash
+# serve the MCP server over stdio
+mcp-service-public-bj serve
+
+# refresh cached data for all providers
+mcp-service-public-bj scrape
+
+# run a search while refreshing the cache
+mcp-service-public-bj scrape --query "carte d'identité" --limit 25
+
+# display cached statistics; add --live to fetch status from the remote site
+mcp-service-public-bj status
+```
+
+The same commands are available via the `Makefile` (e.g. `make serve`, `make scrape ARGS="--query carte"`).
+
+Environment variables can be provided through a shell export or by copying `.env.example`.
+
+## Docker Image
+
+Build and run the containerised MCP server:
+
+```bash
+docker build -t mcp-service-public-bj:latest .
+docker run --rm -it mcp-service-public-bj:latest
+
+# persist registry snapshots locally
+docker run --rm -it \
+  -v $(pwd)/data/registry:/app/data/registry \
+  mcp-service-public-bj:latest
+```
+
+Use `-e` flags to override configuration (e.g. `-e MCP_SP_CACHE_DIR=/app/data/registry`).
+
 ## Adding Additional Providers
 - Create a new provider class inheriting from `server.providers.BaseProvider`.
 - Implement live scraping logic and register it via `server.registry.RegistryState` (categories, services, selector profiles).

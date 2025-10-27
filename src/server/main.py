@@ -83,7 +83,7 @@ def _build_tool_definitions() -> list[types.Tool]:
     ]
 
 
-async def _serve_stdio(settings: Settings) -> None:
+async def serve_stdio(settings: Settings) -> None:
     registry_state, registry_store = load_registry_state(settings)
     health_monitor = ScraperHealthMonitor()
     registry = await initialise_providers(settings, registry_state, health_monitor)
@@ -207,7 +207,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.transport != "stdio":
         raise SystemExit("Only stdio transport is currently supported.")
 
-    asyncio.run(_serve_stdio(settings))
+    asyncio.run(serve_stdio(settings))
 
 
 if __name__ == "__main__":  # pragma: no cover

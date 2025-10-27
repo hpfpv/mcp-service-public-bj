@@ -1,0 +1,16 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.tmp
+*.log
+.venv
+.env
+.env.*
+data/registry/registry.json
+node_modules
+.dist
+.idea
+.vscode
