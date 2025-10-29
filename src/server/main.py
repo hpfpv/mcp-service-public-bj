@@ -15,7 +15,8 @@ from mcp.server.lowlevel import server as lowlevel_server
 from mcp.server.streamable_http import StreamableHTTPServerTransport
 from mcp.server.stdio import stdio_server
 from starlette.applications import Starlette
-from starlette.responses import JSONResponse
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 from .bootstrap import initialise_providers, load_registry_state, shutdown_providers
@@ -152,7 +153,7 @@ class MCPServerRuntime:
                 provider_id=arguments.get("provider_id"),
                 query=arguments.get("query", ""),
                 category_id=arguments.get("category_id"),
-                limit=int(arguments.get("limit", 10)),
+                limit=_coerce_optional_int(arguments.get("limit")),
                 offset=int(arguments.get("offset", 0)),
                 refresh=bool(arguments.get("refresh", False)),
                 persist_state=self.persist_state,
@@ -218,8 +219,18 @@ class MCPServerRuntime:
             if self._is_shutdown:
                 return
             self._is_shutdown = True
+        try:
             await shutdown_providers(self.registry)
+        except asyncio.CancelledError:
+            logger.debug("Provider shutdown cancelled; continuing cleanup.")
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning("Provider shutdown raised an exception: %s", exc, exc_info=exc)
+        try:
             await self.persist_state()
+        except asyncio.CancelledError:
+            logger.debug("Persist state cancelled; cache may be partially written.")
+        except Exception as exc:  # pragma: no cover - best effort persistence
+            logger.warning("Failed to persist registry state during shutdown: %s", exc, exc_info=exc)
 
 
 async def serve_stdio(settings: Settings) -> None:
@@ -276,12 +287,30 @@ async def serve_http(
         Route("/healthz", endpoint=health_endpoint, methods=["GET"]),
     ]
 
-    app = Starlette(routes=routes, lifespan=lifespan)
+    @asynccontextmanager
+    async def graceful_lifespan(app: Starlette):
+        async with lifespan(app):
+            try:
+                yield
+            except asyncio.CancelledError:
+                logger.debug("Lifespan cancelled; continuing shutdown.")
 
-    async def transport_app(scope, receive, send):
-        await transport.handle_request(scope, receive, send)
+    app = Starlette(routes=routes, lifespan=graceful_lifespan)
 
-    app.mount("/mcp", transport_app)
+    async def transport_endpoint(request: Request) -> Response:
+        await transport.handle_request(request.scope, request.receive, request._send)
+        return Response(status_code=204)
+
+    app.add_route(
+        "/mcp",
+        transport_endpoint,
+        methods=["GET", "POST", "DELETE", "HEAD"],
+    )
+    app.add_route(
+        "/mcp/",
+        transport_endpoint,
+        methods=["GET", "POST", "DELETE", "HEAD"],
+    )
 
     config = uvicorn.Config(
         app,
@@ -295,18 +324,32 @@ async def serve_http(
     try:
         logger.info("Starting streamable HTTP server on %s:%s", host, port)
         await server.serve()
+    except KeyboardInterrupt:
+        logger.info("Shutdown requested (KeyboardInterrupt).")
+    except asyncio.CancelledError:
+        logger.info("Server task cancelled; shutting down.")
     finally:
         await transport.terminate()
-        await runtime.shutdown()
+        try:
+            await runtime.shutdown()
+        except asyncio.CancelledError:
+            logger.debug("Runtime shutdown cancelled; state may already be persisted.")
+
+
+def _coerce_optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    return int(value)
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Run the MCP Service Public BJ server")
     parser.add_argument(
-        "--transport",
-        default="stdio",
-        choices=["stdio", "http"],
-        help="Transport to use for serving the MCP protocol.",
+        "command",
+        nargs="?",
+        choices=["serve", "serve-http"],
+        default="serve",
+        help="Mode to run (default: serve, i.e. stdio transport).",
     )
     parser.add_argument(
         "--host",
@@ -331,10 +374,12 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
+    command = args.command
+
     logging.basicConfig(level=getattr(logging, args.log_level.upper(), logging.INFO))
     settings = get_settings()
 
-    if args.transport == "stdio":
+    if command == "serve":
         asyncio.run(serve_stdio(settings))
         return
 

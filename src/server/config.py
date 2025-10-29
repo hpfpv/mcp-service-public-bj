@@ -11,9 +11,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def _default_cache_dir() -> Path:
-    # anchor the default cache directory to the project root so it works
-    # regardless of the current working directory (e.g. when launched via MCP).
-    return Path(__file__).resolve().parents[2] / "data" / "registry"
+    module_root = Path(__file__).resolve().parents[2]
+    if (module_root / "pyproject.toml").exists():
+        return module_root / "data" / "registry"
+    return Path.home() / ".cache" / "mcp-service-public-bj"
 
 
 class Settings(BaseSettings):

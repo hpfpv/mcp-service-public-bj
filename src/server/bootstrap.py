@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 from .config import Settings, get_settings
 from .health import ScraperHealthMonitor
@@ -43,4 +46,13 @@ async def initialise_providers(
 
 
 async def shutdown_providers(registry: ProviderRegistry) -> None:
-    await asyncio.gather(*(provider.shutdown() for provider in registry.all()))
+    tasks = [provider.shutdown() for provider in registry.all()]
+    if not tasks:
+        return
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    for result in results:
+        if isinstance(result, asyncio.CancelledError):
+            logger.debug("Provider shutdown cancelled; ignoring.")
+            continue
+        if isinstance(result, Exception):
+            logger.warning("Provider shutdown raised an exception: %s", result, exc_info=result)

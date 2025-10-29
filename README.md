@@ -50,7 +50,7 @@ Run this mode when the server must be shared across users or deployed in a conta
 ### From source (development setup)
 
 ```bash
-git clone https://github.com/<your-org>/mcp-service-public-bj.git
+git clone https://github.com/hpfpv/mcp-service-public-bj.git
 cd mcp-service-public-bj
 python -m venv .venv
 source .venv/bin/activate
@@ -61,17 +61,14 @@ pip install -e .[dev]
 pytest
 ```
 
-### Docker image
+### Docker image (Recommanded)
 
 ```bash
 docker build -t mcp-service-public-bj:latest .
-docker run --rm -it \
-  -v $(pwd)/data/registry:/app/data/registry \
-  -p 8000:8000 \
-  mcp-service-public-bj:latest
+docker run -i mcp-service-public-bj:latest serve-http
 ```
 
-The container executes `mcp-service-public-bj serve-http --host 0.0.0.0 --port 8000`, exposing the streamable HTTP transport on `http://localhost:8000`. Mount `data/registry` to persist registry snapshots between runs.
+The image uses `python3 -m server.main` as its entrypoint; provide the desired sub-command (`serve`, `serve-http`, `scrape`) as extra arguments. Defaults to `serve` for stdio. Add `-v $(pwd)/data/registry:/app/data/registry` if you want registry snapshots to persist between runs.
 
 ## Configuration
 
@@ -88,124 +85,96 @@ Environment variables (see `.env.example`):
 
 ## MCP Client Integration
 
-### Claude Desktop (macOS / Windows)
-Follow the [official Claude documentation](https://modelcontextprotocol.io/docs/develop/connect-local-servers#claude-desktop) and register the server over stdio:
+### Summary
+- **Claude Desktop** supports stdio only; you can run the server from a local virtualenv or via Docker.
+- **Visual Studio Code** supports stdio (local or Docker) and direct HTTP connections to a running `serve-http` instance.
+- For Docker-based, add `--volume /path/to/registry:/app/data/registry` if you need persistent registry snapshots.
 
-1. Install the project (`pip install -e .`).
-2. Edit the configuration file (see [Claude Desktop docs](https://modelcontextprotocol.io/docs/develop/connect-local-servers#claude-desktop)):
-   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - Windows: `%APPDATA%/Claude/claude_desktop_config.json`
-3. Add (or update) an entry following Claude’s expected shape:
-   ```json
-   {
-     "mcpServers": {
-       "service-public-bj": {
-         "command": "/Users/<you>/mcp-service-public-bj/.venv/bin/python",
-         "args": [
-           "-m",
-           "server.main",
-           "--transport",
-           "stdio"
-         ],
-         "env": {
-           "PYTHONPATH": "/Users/<you>/mcp-service-public-bj/src"
-         },
-         "workingDirectory": "/Users/<you>/mcp-service-public-bj"
-       }
-     }
-   }
-   ```
-   Adjust paths for your environment (the entry mirrors the filesystem example in Claude’s documentation). `env` is optional but helps when the project isn’t installed system-wide.
-4. Restart Claude Desktop and toggle the server in **Settings → MCP Servers**.
+### Claude Desktop (stdio)
+Edit the configuration file (macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`, Windows: `%APPDATA%/Claude/claude_desktop_config.json`) to include the variant you want to use:
 
-> Claude Desktop only supports stdio transports today. Use the HTTP bridge workflow below if you need to expose the server to additional clients.
-
-### Visual Studio Code (Copilot Chat)
-VS Code uses the configuration described in the [official Copilot/MCP guidance](https://code.visualstudio.com/docs/copilot/customization/mcp-servers). Add this block to `.vscode/settings.json`:
-
-```json
-{
-  "mcp.servers": {
-    "service-public-bj": {
-      "command": "/Users/<you>/mcp-service-public-bj/.venv/bin/python",
-      "args": [
-        "-m",
-        "server.main",
-        "--transport",
-        "stdio"
-      ],
-      "transport": "stdio",
-      "cwd": "/Users/<you>/mcp-service-public-bj"
-    }
-  }
-}
-```
-
-Reload VS Code and enable the server inside Copilot Chat.
-
-### Using the Docker image with stdio clients
-If you prefer to run the server in a container while still exposing stdio to Claude Desktop or VS Code, override the default command (which starts the HTTP transport) so the container launches `serve` instead. Example Claude configuration:
+#### Local dev environment
 
 ```json
 {
   "mcpServers": {
-    "service-public-bj": {
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "-i",
-        "--volume",
-        "/Users/<you>/mcp-service-public-bj/data/registry:/app/data/registry",
-        "mcp-service-public-bj:latest",
-        "mcp-service-public-bj",
-        "serve"
-      ],
-      "env": {
-        "PYTHONUNBUFFERED": "1"
-      }
+    "service-public-bj-local": {
+      "command": "/Users/<you>/mcp-service-public-bj/.venv/bin/python",
+      "args": ["-m", "server.main"]
     }
   }
 }
 ```
 
-For VS Code, place the equivalent entry in `.vscode/settings.json`:
+#### Docker
+```json
+{
+  "mcpServers": {
+    "service-public-bj-docker": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "mcp-service-public-bj:latest"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop and enable the desired server(s) under **Settings → Developers → MCP Servers**.
+
+### Visual Studio Code (stdio & HTTP)
+Edit the configuration file (macOS: `~/Library/Application Support/Code/User/mcp.json`, Windows: `%APPDATA%/Code/User/mcp.json`) to include the variant you want to use:
+
+#### Local dev environment
+```json
+{
+  "servers": {
+    "service-public-local-stdio": {
+      "type": "stdio",
+      "command": "/Users/<you>/mcp-service-public-bj/.venv/bin/python",
+      "args": ["-m", "server.main"]
+    }
+  },
+  "inputs": []
+}
+```
+
+#### Docker
+```json
+{
+  "servers": {
+    "service-public-docker-stdio": {
+      "type": "stdio",
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "mcp-service-public-bj:latest"]
+    },
+    "mcp-service-public-bj-http": {
+      "type": "http",
+      "url": "http://localhost:8000/mcp"
+    }
+  },
+  "inputs": []
+}
+```
+
+#### HTTP
+To add the MCP server as an HTTP endpoint on VSCode, run the Docker container using the `serve-httpsub-command`:
+
+```bash
+docker build -t mcp-service-public-bj:latest .
+docker run -i mcp-service-public-bj:latest serve-http
+```
+Then update the `mcp.json` file as follow:
 
 ```json
 {
-  "mcp.servers": {
-    "service-public-bj": {
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "-i",
-        "--volume",
-        "/Users/<you>/mcp-service-public-bj/data/registry:/app/data/registry",
-        "mcp-service-public-bj:latest",
-        "mcp-service-public-bj",
-        "serve"
-      ],
-      "transport": "stdio"
+  "servers": {
+    "mcp-service-public-bj-http": {
+      "type": "http",
+      "url": "http://localhost:8000/mcp"
     }
-  }
+  },
+  "inputs": []
 }
 ```
-
-Adjust the volume path for your host; it ensures registry snapshots persist between runs. When running on Windows, replace the POSIX-style path with the appropriate Windows path (for example `C:/Users/<you>/mcp-service-public-bj/data/registry`).
-
-### Any client via HTTP bridge (Claude web, shared deployments, etc.)
-When you run the streamable HTTP transport, connect clients using a bridge as recommended in the [MCP integration guide](https://modelcontextprotocol.io/docs/develop/connect-local-servers#using-the-model-context-protocol-cli):
-
-1. Start the HTTP server:
-   - Local: `mcp-service-public-bj serve-http --host 0.0.0.0 --port 8000`
-   - Docker: `docker run -p 8000:8000 mcp-service-public-bj:latest`
-2. Launch an MCP bridge that proxies HTTP requests to your client’s preferred protocol. Using the official CLI:
-   ```bash
-   npx @modelcontextprotocol/cli http http://localhost:8000/mcp --port 3333
-   ```
-   Adjust flags to match your environment (see CLI docs for TLS/auth options). Add `--json` if the server is running with `--json-response`.
-3. Configure your client (Claude web, custom agent, etc.) to talk to the bridge endpoint on `http://localhost:3333`.
 
 ## Command Line Usage
 
@@ -213,11 +182,11 @@ When you run the streamable HTTP transport, connect clients using a bridge as re
 # launch the MCP server (stdio)
 mcp-service-public-bj serve
 
-# launch the streamable HTTP server (multi-client)
+# launch the streamable HTTP server
 mcp-service-public-bj serve-http --host 0.0.0.0 --port 8000
 
 # refresh data and prefetch a query
-mcp-service-public-bj scrape --query "carte" --limit 25
+mcp-service-public-bj scrape --query "passeport" --limit 25
 
 # refresh a specific service record
 mcp-service-public-bj scrape --service-id PS00409
@@ -226,7 +195,7 @@ mcp-service-public-bj scrape --service-id PS00409
 mcp-service-public-bj status --live
 ```
 
-Equivalent Makefile targets: `make serve`, `make serve-http ARGS="--host 0.0.0.0 --port 8000"`, `make scrape ARGS="--query carte"`, `make status ARGS="--live"`.
+Equivalent Makefile targets: `make serve`, `make serve-http ARGS="--host 0.0.0.0 --port 8000"`, `make scrape ARGS="--query passeport"`, `make status ARGS="--live"`.
 
 ## Tools Overview
 
@@ -244,21 +213,10 @@ Equivalent Makefile targets: `make serve`, `make serve-http ARGS="--host 0.0.0.0
 - Snapshots not persisted in Docker → mount a volume on `/app/data/registry`.
 - SSL errors → configure `REQUESTS_CA_BUNDLE`/`SSL_CERT_FILE`.
 
-## Development
-
-- Style: `black`, `ruff`, `mypy` (strict). Use `make lint`, `make mypy`, `make test`.
-- Tests use stubs instead of live HTTP calls.
-- Adding a provider: implement `BaseProvider`, register in `server/providers/__init__.py`, add tests.
-
 ## Release Notes
 
 - **0.1.0** – initial MCP release (CLI, pagination, detail caching, Docker image).
 
-## Additional Docs
-
-- `.specs/mcp-service-public-bj/requirements.md`
-- `.specs/mcp-service-public-bj/design.md`
-- `.specs/mcp-service-public-bj/tasks.md`
 
 ## License
 
