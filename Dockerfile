@@ -13,4 +13,6 @@ COPY data data
 RUN pip install --upgrade pip \
     && pip install .
 
-CMD ["mcp-service-public-bj", "serve"]
+EXPOSE 8000
+
+CMD ["mcp-service-public-bj", "serve-http", "--host", "0.0.0.0", "--port", "8000"]

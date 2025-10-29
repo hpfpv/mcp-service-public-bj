@@ -144,7 +144,7 @@ class ServicePublicBJProvider(BaseProvider):
         query: str,
         *,
         category_id: str | None = None,
-        limit: int = 10,
+        limit: int | None = None,
         offset: int = 0,
         refresh: bool = False,
     ) -> List[ServiceSummary]:
@@ -153,7 +153,7 @@ class ServicePublicBJProvider(BaseProvider):
         )
         services: Sequence[dict[str, Any]] = data.get("services", [])
         results: List[ServiceSummary] = []
-        slice_end = offset + limit
+        slice_end = offset + limit if limit is not None else None
         for item in services[offset:slice_end]:
             service_id = item.get("id")
             title = item.get("name")

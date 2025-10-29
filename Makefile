@@ -3,7 +3,7 @@ PIP ?= $(PYTHON) -m pip
 VENV ?= .venv
 ACTIVATE = . $(VENV)/bin/activate
 
-.PHONY: install dev-install lint format test serve scrape status docker-build
+.PHONY: install dev-install lint format test serve serve-http scrape status docker-build
 
 install:
 	$(PIP) install --upgrade pip
@@ -27,6 +27,9 @@ test:
 
 serve:
 	$(ACTIVATE) && mcp-service-public-bj serve
+
+serve-http:
+	$(ACTIVATE) && mcp-service-public-bj serve-http $(ARGS)
 
 scrape:
 	$(ACTIVATE) && mcp-service-public-bj scrape $(ARGS)

@@ -69,7 +69,7 @@ async def search_services_tool(
     provider_id: str | None = None,
     query: str,
     category_id: str | None = None,
-    limit: int = 10,
+    limit: int | None = None,
     offset: int = 0,
     refresh: bool = False,
     persist_state: PersistCallable = None,
@@ -77,11 +77,12 @@ async def search_services_tool(
     provider = _resolve_provider(registry, provider_id)
     warnings: List[str] = []
     source = "live"
+    requested_limit = limit if limit is not None else None
     try:
         results = await provider.search_services(
             query,
             category_id=category_id,
-            limit=limit,
+            limit=requested_limit,
             offset=offset,
             refresh=refresh,
         )
@@ -91,22 +92,34 @@ async def search_services_tool(
         source = "cache"
         warnings.append(str(exc))
         index = ServiceSearchIndex(registry_state, provider.provider_id)
-        results = index.search(query, limit=offset + limit)[offset : offset + limit]
+        catalog = registry_state.ensure_catalog(provider.provider_id)
+        fallback_limit = offset + requested_limit if requested_limit is not None else len(
+            catalog.services
+        ) or 0
+        if fallback_limit == 0:
+            fallback_limit = 100
+        cache_hits = index.search(query, limit=fallback_limit)
+        results = cache_hits[offset : offset + (requested_limit or len(cache_hits))]
         if not results:
             raise
 
     total_results = getattr(provider, "_last_search_total", None)
     if total_results is None:
         total_results = offset + len(results)
-    next_offset = offset + len(results)
-    if next_offset >= total_results:
+    if requested_limit is None:
         next_offset = None
+    else:
+        next_offset = offset + len(results)
+        if next_offset >= total_results:
+            next_offset = None
+
+    effective_limit = requested_limit if requested_limit is not None else len(results)
 
     payload: Dict[str, Any] = {
         "provider_id": provider.provider_id,
         "source": source,
-        "results": [result.model_dump(mode="json") for result in results[:limit]],
-        "limit": limit,
+        "results": [result.model_dump(mode="json") for result in results],
+        "limit": effective_limit,
         "offset": offset,
         "total_results": total_results,
         "next_offset": next_offset,

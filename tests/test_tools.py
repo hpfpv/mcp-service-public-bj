@@ -40,7 +40,7 @@ class DummyProvider(BaseProvider):
         query,
         *,
         category_id=None,
-        limit=10,
+        limit=None,
         offset=0,
         refresh: bool = False,
     ):
@@ -102,7 +102,7 @@ async def test_tool_routing(tmp_path):
     assert results["results"][0]["id"] == "svc"
     assert results["source"] == "live"
     assert results["offset"] == 0
-    assert results["limit"] == 10
+    assert results["limit"] == 1
     assert results["total_results"] >= 1
 
     details = await get_service_details_tool(

@@ -172,3 +172,28 @@ async def test_search_services_respects_offset(tmp_path):
     second_batch = await provider.search_services("test", limit=5, offset=5)
     assert first_batch[0].id == "PS0000"
     assert second_batch[0].id == "PS0005"
+
+
+@pytest.mark.asyncio
+async def test_search_services_without_limit_returns_all(tmp_path):
+    settings = Settings(cache_dir=tmp_path, base_url="https://example.com/")
+    provider = ServicePublicBJProvider(settings)
+    search_url = "https://example.com/api/portal/publicservices/search?query=test"
+    payload = json.dumps(
+        {
+            "services": [
+                {
+                    "id": f"PS{i:04d}",
+                    "name": f"Service {i}",
+                    "description": "desc",
+                    "categories": ["Affaires"],
+                }
+                for i in range(15)
+            ]
+        }
+    )
+    provider._fetcher = StubFetcher({search_url: payload})
+
+    results = await provider.search_services("test")
+    assert len(results) == 15
+    assert provider._last_search_total == 15

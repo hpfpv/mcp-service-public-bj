@@ -10,7 +10,7 @@ from typing import Any, Iterable, Optional
 from .bootstrap import initialise_providers, load_registry_state, shutdown_providers
 from .config import Settings, get_settings
 from .health import ScraperHealthMonitor
-from .main import serve_stdio
+from .main import serve_http, serve_stdio
 
 
 async def _scrape_async(
@@ -110,6 +110,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Logging level (DEBUG, INFO, WARNING, ERROR)",
     )
 
+    serve_http_parser = subparsers.add_parser(
+        "serve-http", help="Run the MCP server over HTTP (streamable) transport"
+    )
+    serve_http_parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host/IP to bind",
+    )
+    serve_http_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to bind",
+    )
+    serve_http_parser.add_argument(
+        "--log-level",
+        default="INFO",
+        help="Logging level (DEBUG, INFO, WARNING, ERROR)",
+    )
+    serve_http_parser.add_argument(
+        "--json-response",
+        action="store_true",
+        help="Return JSON responses instead of streamed events",
+    )
+
     scrape_parser = subparsers.add_parser(
         "scrape", help="Refresh cached data or collect specific resources"
     )
@@ -143,9 +168,23 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.command == "serve":
         import logging
-
         logging.basicConfig(level=getattr(logging, args.log_level.upper(), logging.INFO))
         asyncio.run(serve_stdio(settings))
+        return 0
+
+    if args.command == "serve-http":
+        import logging
+
+        logging.basicConfig(level=getattr(logging, args.log_level.upper(), logging.INFO))
+        asyncio.run(
+            serve_http(
+                settings,
+                host=args.host,
+                port=args.port,
+                log_level=args.log_level,
+                json_response=args.json_response,
+            )
+        )
         return 0
 
     if args.command == "scrape":
