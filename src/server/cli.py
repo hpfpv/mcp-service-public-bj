@@ -169,22 +169,28 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.command == "serve":
         import logging
         logging.basicConfig(level=getattr(logging, args.log_level.upper(), logging.INFO))
-        asyncio.run(serve_stdio(settings))
+        try:
+            asyncio.run(serve_stdio(settings))
+        except KeyboardInterrupt:
+            logging.info("Shutdown requested (KeyboardInterrupt).")
         return 0
 
     if args.command == "serve-http":
         import logging
 
         logging.basicConfig(level=getattr(logging, args.log_level.upper(), logging.INFO))
-        asyncio.run(
-            serve_http(
-                settings,
-                host=args.host,
-                port=args.port,
-                log_level=args.log_level,
-                json_response=args.json_response,
+        try:
+            asyncio.run(
+                serve_http(
+                    settings,
+                    host=args.host,
+                    port=args.port,
+                    log_level=args.log_level,
+                    json_response=args.json_response,
+                )
             )
-        )
+        except KeyboardInterrupt:
+            logging.info("Shutdown requested (KeyboardInterrupt).")
         return 0
 
     if args.command == "scrape":

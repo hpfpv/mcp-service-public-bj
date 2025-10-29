@@ -235,11 +235,19 @@ class MCPServerRuntime:
 
 async def serve_stdio(settings: Settings) -> None:
     runtime = await MCPServerRuntime.create(settings)
-    try:
+    async def runner():
         async with stdio_server() as (read_stream, write_stream):
             await runtime.run_session(read_stream, write_stream)
+
+    try:
+        await runner()
+    except KeyboardInterrupt:
+        logger.info("Shutdown requested (KeyboardInterrupt).")
     finally:
-        await runtime.shutdown()
+        try:
+            await runtime.shutdown()
+        except asyncio.CancelledError:
+            logger.debug("Runtime shutdown cancelled during stdio exit.")
 
 
 async def serve_http(
@@ -297,20 +305,26 @@ async def serve_http(
 
     app = Starlette(routes=routes, lifespan=graceful_lifespan)
 
-    async def transport_endpoint(request: Request) -> Response:
-        await transport.handle_request(request.scope, request.receive, request._send)
-        return Response(status_code=204)
+    async def transport_app(scope, receive, send):
+        if scope["type"] != "http":
+            await transport.handle_request(scope, receive, send)
+            return
 
-    app.add_route(
-        "/mcp",
-        transport_endpoint,
-        methods=["GET", "POST", "DELETE", "HEAD"],
-    )
-    app.add_route(
-        "/mcp/",
-        transport_endpoint,
-        methods=["GET", "POST", "DELETE", "HEAD"],
-    )
+        request = Request(scope, receive)
+        accept = request.headers.get("accept", "")
+        if scope["method"] == "GET" and "text/event-stream" not in accept:
+            message = (
+                "The /mcp endpoint expects Accept: text/event-stream. "
+                "Use POST for JSON-RPC messages or adjust the Accept header."
+            )
+            response = Response(message, status_code=406)
+            await response(scope, receive, send)
+            return
+
+        await transport.handle_request(scope, receive, send)
+
+    app.mount("/mcp", transport_app)
+    app.mount("/mcp/", transport_app)
 
     config = uvicorn.Config(
         app,

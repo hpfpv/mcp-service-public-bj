@@ -55,7 +55,7 @@ cd mcp-service-public-bj
 python -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
-pip install -e .[dev]
+pip install -e ".[dev]"
 
 # run tests
 pytest
@@ -85,15 +85,13 @@ Environment variables (see `.env.example`):
 
 ## MCP Client Integration
 
-### Summary
-- **Claude Desktop** supports stdio only; you can run the server from a local virtualenv or via Docker.
-- **Visual Studio Code** supports stdio (local or Docker) and direct HTTP connections to a running `serve-http` instance.
-- For Docker-based, add `--volume /path/to/registry:/app/data/registry` if you need persistent registry snapshots.
+### Quick Reference
+- **Claude Desktop** → stdio only (local venv or Docker).
+- **Visual Studio Code** → stdio (local/Docker) and HTTP.
+- Add `--volume /path/to/registry:/app/data/registry` to Docker runs if you want persistent registry snapshots.
 
 ### Claude Desktop (stdio)
-Edit the configuration file (macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`, Windows: `%APPDATA%/Claude/claude_desktop_config.json`) to include the variant you want to use:
-
-#### Local dev environment
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%/Claude/claude_desktop_config.json` (Windows) and include both options:
 
 ```json
 {
@@ -101,15 +99,7 @@ Edit the configuration file (macOS: `~/Library/Application Support/Claude/claude
     "service-public-bj-local": {
       "command": "/Users/<you>/mcp-service-public-bj/.venv/bin/python",
       "args": ["-m", "server.main"]
-    }
-  }
-}
-```
-
-#### Docker
-```json
-{
-  "mcpServers": {
+    },
     "service-public-bj-docker": {
       "command": "docker",
       "args": ["run", "--rm", "-i", "mcp-service-public-bj:latest"]
@@ -118,12 +108,11 @@ Edit the configuration file (macOS: `~/Library/Application Support/Claude/claude
 }
 ```
 
-Restart Claude Desktop and enable the desired server(s) under **Settings → Developers → MCP Servers**.
+Restart Claude Desktop and enable the server(s) under **Settings → Developers → MCP Servers**.
 
-### Visual Studio Code (stdio & HTTP)
-Edit the configuration file (macOS: `~/Library/Application Support/Code/User/mcp.json`, Windows: `%APPDATA%/Code/User/mcp.json`) to include the variant you want to use:
+### Visual Studio Code
+Update `~/Library/Application Support/Code/User/mcp.json` (or the equivalent path on your system) with the transports you need:
 
-#### Local dev environment
 ```json
 {
   "servers": {
@@ -131,16 +120,7 @@ Edit the configuration file (macOS: `~/Library/Application Support/Code/User/mcp
       "type": "stdio",
       "command": "/Users/<you>/mcp-service-public-bj/.venv/bin/python",
       "args": ["-m", "server.main"]
-    }
-  },
-  "inputs": []
-}
-```
-
-#### Docker
-```json
-{
-  "servers": {
+    },
     "service-public-docker-stdio": {
       "type": "stdio",
       "command": "docker",
@@ -155,27 +135,12 @@ Edit the configuration file (macOS: `~/Library/Application Support/Code/User/mcp
 }
 ```
 
-#### HTTP
-To add the MCP server as an HTTP endpoint on VSCode, run the Docker container using the `serve-httpsub-command`:
+- Use one of the stdio entries when VS Code should launch the server (local venv or Docker container).
+- Use the HTTP entry when you run `mcp-service-public-bj serve-http --host 0.0.0.0 --port 8000` (or the Docker equivalent) separately and only need VS Code to connect.
 
-```bash
-docker build -t mcp-service-public-bj:latest .
-docker run -i mcp-service-public-bj:latest serve-http
-```
-Then update the `mcp.json` file as follow:
+Swap `mcp-service-public-bj:latest` with your published tag (for example `ghcr.io/<org>/mcp-service-public-bj:latest`) if you distribute prebuilt images.
 
-```json
-{
-  "servers": {
-    "mcp-service-public-bj-http": {
-      "type": "http",
-      "url": "http://localhost:8000/mcp"
-    }
-  },
-  "inputs": []
-}
-```
-
+### Any client via HTTP bridge (Claude web, shared deployments, etc.)
 ## Command Line Usage
 
 ```bash
@@ -206,12 +171,55 @@ Equivalent Makefile targets: `make serve`, `make serve-http ARGS="--host 0.0.0.0
 | `get_service_details` | `service_id`, `refresh` | Full service details (summary, steps, documents, contacts) |
 | `get_scraper_status` | `provider_id` (optional) | Cache/provider diagnostics |
 
+### Tool Samples
+
+```jsonc
+// list_categories
+{
+  "tool": "list_categories",
+  "arguments": {}
+}
+
+// search_services
+{
+  "tool": "search_services",
+  "arguments": {
+    "query": "renouvellement passeport",
+    "limit": 5
+  }
+}
+
+// get_service_details
+{
+  "tool": "get_service_details",
+  "arguments": {
+    "service_id": "PS00328"
+  }
+}
+
+// get_scraper_status
+{
+  "tool": "get_scraper_status",
+  "arguments": {}
+}
+```
+
 ## Troubleshooting
 
 - No results → check network access and run `scrape --refresh`.
 - Stale data → call `get_service_details` with `refresh=true` or use `scrape --service-id`.
 - Snapshots not persisted in Docker → mount a volume on `/app/data/registry`.
 - SSL errors → configure `REQUESTS_CA_BUNDLE`/`SSL_CERT_FILE`.
+
+Performance considerations:
+- Live calls honour the `MCP_SP_CONCURRENCY` limit (default 2). Upstream responses usually return within one second, but latency depends on service-public.bj.
+- Cached calls respect `MCP_SP_CACHE_TTL` (default 300 s); tweak it to balance freshness versus reuse.
+
+Error handling:
+- When the portal is unreachable the server returns cached data (if available) and includes a `warnings` array; otherwise it surfaces a descriptive error through the MCP response.
+
+Protocol compatibility:
+- Validated against MCP protocol version `2025-06-18` (Claude + VS Code MCP). The implementation relies on the `mcp>=1.19.0` Python package and the streamable HTTP transport introduced in that release.
 
 ## Release Notes
 
