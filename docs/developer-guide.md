@@ -205,10 +205,12 @@ mcp-service-public-bj/
 
 ### Test Categories
 
-1. **Unit Tests**: Individual component testing
-2. **Integration Tests**: Provider and API testing with mocked responses
-3. **End-to-End Tests**: Full HTTP server testing
-4. **Contract Tests**: MCP protocol compliance
+1. **Unit Tests**: Pure Python modules (search index, registry, tools) with isolated logic
+2. **Integration Tests**: Provider + live fetch plumbing using mocked HTTP 
+3. **Transport End-to-End Tests**: Full stdio and HTTP runtime exercises (`tests/test_stdio_e2e.py`, `tests/test_http_e2e.py`)
+4. **Resilience & Chaos Tests**: Network failures, malformed data, cache failover, concurrency stress (`tests/test_resilience.py`)
+5. **Performance Benchmarks**: Optional timing assertions behind the `performance` marker
+6. **Contract Tests**: MCP protocol compliance and schema validation of tool payloads
 
 ### Running Tests
 ```bash

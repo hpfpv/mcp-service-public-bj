@@ -75,6 +75,9 @@ addopts = [
   "--strict-markers",
   "--disable-warnings"
 ]
+markers = [
+  "performance: Performance benchmarks for MCP tool execution"
+]
 testpaths = ["tests"]
 
 [project.scripts]
