@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from server.models import Category, ServiceSummary
 from server.registry import RegistryState, RegistryStore, SelectorProfile

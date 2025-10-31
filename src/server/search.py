@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, List
 
 from rapidfuzz import fuzz
 
@@ -14,7 +13,7 @@ from .selectors import normalise_whitespace
 TOKEN_PATTERN = re.compile(r"[^\w]+", re.UNICODE)
 
 
-def _tokenise(text: str) -> List[str]:
+def _tokenise(text: str) -> list[str]:
     cleaned = TOKEN_PATTERN.sub(" ", normalise_whitespace(text).lower())
     return [token for token in cleaned.split(" ") if token]
 
@@ -25,7 +24,7 @@ class ServiceSearchIndex:
     def __init__(self, registry: RegistryState, provider_id: str) -> None:
         self._registry = registry
         self._provider_id = provider_id
-        self._index: Dict[str, set[str]] = {}
+        self._index: dict[str, set[str]] = {}
         self.rebuild()
 
     def rebuild(self) -> None:
@@ -38,18 +37,18 @@ class ServiceSearchIndex:
             for token in tokens:
                 self._index.setdefault(token, set()).add(service.id)
 
-    def search(self, query: str, limit: int = 10) -> List[ServiceSummary]:
+    def search(self, query: str, limit: int = 10) -> list[ServiceSummary]:
         if not query.strip():
             return []
 
         catalog = self._registry.ensure_catalog(self._provider_id)
         tokens = _tokenise(query)
-        candidates: Dict[str, int] = {}
+        candidates: dict[str, int] = {}
         for token in tokens:
             for service_id in self._index.get(token, set()):
                 candidates[service_id] = candidates.get(service_id, 0) + 1
 
-        scored: List[tuple[float, ServiceSummary]] = []
+        scored: list[tuple[float, ServiceSummary]] = []
         if candidates:
             for service_id, count in candidates.items():
                 service = catalog.services.get(service_id)
@@ -65,7 +64,7 @@ class ServiceSearchIndex:
                     scored.append((float(fuzzy), service))
 
         scored.sort(key=lambda item: item[0], reverse=True)
-        results: List[ServiceSummary] = []
+        results: list[ServiceSummary] = []
         seen = set()
         for score, service in scored:
             if service.id in seen:

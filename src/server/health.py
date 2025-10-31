@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
-from typing import Dict, List
+from dataclasses import dataclass
 
 
 @dataclass
@@ -24,7 +23,7 @@ class ScraperHealthMonitor:
 
     def __init__(self, max_records: int = 1000) -> None:
         self._max_records = max_records
-        self._records: List[FetchRecord] = []
+        self._records: list[FetchRecord] = []
         self._cache_hits = 0
         self._cache_misses = 0
 
@@ -67,7 +66,7 @@ class ScraperHealthMonitor:
             return 0.0
         return self._cache_hits / total
 
-    def summary(self) -> Dict[str, object]:
+    def summary(self) -> dict[str, object]:
         if not self._records:
             return {
                 "recent_fetches": 0,
@@ -79,7 +78,7 @@ class ScraperHealthMonitor:
         durations = [record.duration_ms for record in self._records]
         successes = sum(1 for record in self._records if record.success)
         errors = [record.error_message for record in self._records if record.error_message]
-        provider_counts: Dict[str, int] = {}
+        provider_counts: dict[str, int] = {}
         for record in self._records:
             provider_counts[record.provider_id] = provider_counts.get(record.provider_id, 0) + 1
 

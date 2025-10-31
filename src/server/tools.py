@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Dict, List
+import time
+from collections.abc import Awaitable, Callable
+from typing import Any
 
+from .metrics import record_tool_invocation
 from .providers import BaseProvider, ProviderRegistry
 from .registry import RegistryState
 from .search import ServiceSearchIndex
@@ -33,10 +36,12 @@ async def list_categories_tool(
     parent_id: str | None = None,
     refresh: bool = False,
     persist_state: PersistCallable = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
+    start = time.perf_counter()
     provider = _resolve_provider(registry, provider_id)
-    warnings: List[str] = []
+    warnings: list[str] = []
     source = "live"
+    status = "success"
     try:
         categories = await provider.list_categories(parent_id=parent_id, refresh=refresh)
         source = getattr(provider, "_last_category_source", source)
@@ -50,9 +55,13 @@ async def list_categories_tool(
         else:
             categories = registry_state.categories_for_parent(provider.provider_id, parent_id)
         if not categories:
+            status = "error"
             raise
+    finally:
+        duration = time.perf_counter() - start
+        record_tool_invocation("list_categories", status, duration)
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "provider_id": provider.provider_id,
         "source": source,
         "categories": [category.model_dump(mode="json") for category in categories],
@@ -73,11 +82,13 @@ async def search_services_tool(
     offset: int = 0,
     refresh: bool = False,
     persist_state: PersistCallable = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
+    start = time.perf_counter()
     provider = _resolve_provider(registry, provider_id)
-    warnings: List[str] = []
+    warnings: list[str] = []
     source = "live"
     requested_limit = limit if limit is not None else None
+    status = "success"
     try:
         results = await provider.search_services(
             query,
@@ -101,6 +112,7 @@ async def search_services_tool(
         cache_hits = index.search(query, limit=fallback_limit)
         results = cache_hits[offset : offset + (requested_limit or len(cache_hits))]
         if not results:
+            status = "error"
             raise
 
     total_results = getattr(provider, "_last_search_total", None)
@@ -114,8 +126,10 @@ async def search_services_tool(
             next_offset = None
 
     effective_limit = requested_limit if requested_limit is not None else len(results)
+    duration = time.perf_counter() - start
+    record_tool_invocation("search_services", status, duration)
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "provider_id": provider.provider_id,
         "source": source,
         "results": [result.model_dump(mode="json") for result in results],
@@ -137,13 +151,22 @@ async def get_service_details_tool(
     service_id: str,
     refresh: bool = False,
     persist_state: PersistCallable = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
+    start = time.perf_counter()
+    status = "success"
     provider = _resolve_provider(registry, provider_id)
-    details = await provider.get_service_details(service_id, refresh=refresh)
-    source = getattr(provider, "_last_detail_source", "live")
-    await _persist(persist_state)
+    try:
+        details = await provider.get_service_details(service_id, refresh=refresh)
+        source = getattr(provider, "_last_detail_source", "live")
+        await _persist(persist_state)
+    except Exception:
+        status = "error"
+        raise
+    finally:
+        duration = time.perf_counter() - start
+        record_tool_invocation("get_service_details", status, duration)
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "provider_id": provider.provider_id,
         "source": source,
         "service": details.model_dump(mode="json"),
@@ -158,13 +181,22 @@ async def validate_service_tool(
     provider_id: str | None = None,
     service_id: str,
     persist_state: PersistCallable = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
+    start = time.perf_counter()
+    status = "success"
     provider = _resolve_provider(registry, provider_id)
-    details = await provider.validate_service(service_id)
-    source = getattr(provider, "_last_detail_source", "live")
-    await _persist(persist_state)
+    try:
+        details = await provider.validate_service(service_id)
+        source = getattr(provider, "_last_detail_source", "live")
+        await _persist(persist_state)
+    except Exception:
+        status = "error"
+        raise
+    finally:
+        duration = time.perf_counter() - start
+        record_tool_invocation("validate_service", status, duration)
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "provider_id": provider.provider_id,
         "source": source,
         "service": details.model_dump(mode="json"),
@@ -178,10 +210,20 @@ async def get_scraper_status_tool(
     registry_state: RegistryState,
     *,
     provider_id: str | None = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
+    start = time.perf_counter()
+    status_label = "success"
     provider = _resolve_provider(registry, provider_id)
-    status = await provider.get_status()
-    catalog = registry_state.ensure_catalog(provider.provider_id)
+    try:
+        status = await provider.get_status()
+        catalog = registry_state.ensure_catalog(provider.provider_id)
+    except Exception:
+        status_label = "error"
+        raise
+    finally:
+        duration = time.perf_counter() - start
+        record_tool_invocation("get_scraper_status", status_label, duration)
+
     registry_meta = {
         "categories_indexed": len(catalog.categories),
         "services_indexed": len(catalog.services),

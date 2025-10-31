@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Optional
 from urllib.parse import urljoin
 
 import httpx
@@ -12,6 +11,7 @@ from aiocache import Cache
 
 from .config import Settings
 from .health import ScraperHealthMonitor
+from .metrics import record_fetch
 
 
 class LiveFetchClient:
@@ -34,7 +34,7 @@ class LiveFetchClient:
             timeout=settings.timeout_seconds,
             headers={"User-Agent": settings.user_agent},
         )
-        self._cache: Optional[Cache] = None
+        self._cache: Cache | None = None
         if settings.cache_ttl_seconds > 0:
             self._cache = Cache(Cache.MEMORY, ttl=settings.cache_ttl_seconds)
 
@@ -61,6 +61,12 @@ class LiveFetchClient:
             if cached is not None:
                 cache_hit = True
                 text = cached
+                record_fetch(
+                    provider=self._provider_id,
+                    cache_hit=True,
+                    outcome="success",
+                    duration_seconds=0.0,
+                )
                 if self._monitor:
                     self._monitor.record_fetch(
                         provider_id=self._provider_id,
@@ -77,6 +83,12 @@ class LiveFetchClient:
                 response.raise_for_status()
                 text = response.text
         except Exception as exc:  # pragma: no cover - network errors
+            record_fetch(
+                provider=self._provider_id,
+                cache_hit=cache_hit,
+                outcome="error",
+                duration_seconds=time.perf_counter() - start,
+            )
             if self._monitor:
                 duration_ms = (time.perf_counter() - start) * 1000
                 self._monitor.record_fetch(
@@ -90,8 +102,15 @@ class LiveFetchClient:
         else:
             if use_cache and self._cache:
                 await self._cache.set(absolute_url, text)
+            duration_seconds = time.perf_counter() - start
+            record_fetch(
+                provider=self._provider_id,
+                cache_hit=cache_hit,
+                outcome="success",
+                duration_seconds=duration_seconds,
+            )
             if self._monitor:
-                duration_ms = (time.perf_counter() - start) * 1000
+                duration_ms = duration_seconds * 1000
                 self._monitor.record_fetch(
                     provider_id=self._provider_id,
                     duration_ms=duration_ms,

@@ -3,7 +3,6 @@ import json
 import pytest
 
 from server.config import Settings
-from server.health import ScraperHealthMonitor
 from server.providers.service_public_bj import ServicePublicBJProvider
 
 

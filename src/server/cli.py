@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import sys
-from typing import Any, Iterable, Optional
+from collections.abc import Iterable
 
 from .bootstrap import initialise_providers, load_registry_state, shutdown_providers
 from .config import Settings, get_settings
@@ -161,7 +160,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     settings = get_settings()

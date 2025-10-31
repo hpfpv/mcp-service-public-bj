@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import AnyHttpUrl, BaseModel, Field
 
@@ -56,7 +55,7 @@ class ServiceSummary(BaseModel):
     title: str
     url: AnyHttpUrl
     provider_id: str = Field(default="service-public-bj")
-    category_ids: List[str] = Field(default_factory=list)
+    category_ids: list[str] = Field(default_factory=list)
     excerpt: str | None = None
     score: float | None = Field(
         default=None,
@@ -69,10 +68,10 @@ class ServiceDetails(ServiceSummary):
 
     summary: str | None = None
     last_updated: datetime | None = None
-    steps: List[Step] = Field(default_factory=list)
-    requirements: List[Requirement] = Field(default_factory=list)
-    documents: List[DocumentLink] = Field(default_factory=list)
-    costs: List[str] = Field(default_factory=list)
+    steps: list[Step] = Field(default_factory=list)
+    requirements: list[Requirement] = Field(default_factory=list)
+    documents: list[DocumentLink] = Field(default_factory=list)
+    costs: list[str] = Field(default_factory=list)
     processing_time: str | None = None
-    contacts: List[ContactPoint] = Field(default_factory=list)
-    external_links: List[DocumentLink] = Field(default_factory=list)
+    contacts: list[ContactPoint] = Field(default_factory=list)
+    external_links: list[DocumentLink] = Field(default_factory=list)

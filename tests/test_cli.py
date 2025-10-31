@@ -64,7 +64,7 @@ def test_main_serve_http_dispatch(monkeypatch):
         [
             "serve-http",
             "--host",
-            "0.0.0.0",
+            "127.0.0.1",
             "--port",
             "9000",
             "--log-level",
@@ -75,7 +75,7 @@ def test_main_serve_http_dispatch(monkeypatch):
     assert exit_code == 0
     assert called["args"] == {
         "settings": "settings",
-        "host": "0.0.0.0",
+        "host": "127.0.0.1",
         "port": 9000,
         "log_level": "DEBUG",
         "json_response": True,

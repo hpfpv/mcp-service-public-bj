@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Iterable, Sequence
+from collections.abc import Iterable, Sequence
+from typing import Any
 
 from ..config import Settings
 
 if False:  # pragma: no cover
-    from typing import Protocol
+    pass
 
 try:
     from typing import TYPE_CHECKING
@@ -49,7 +50,7 @@ class BaseProvider(ABC):
     @abstractmethod
     async def list_categories(
         self, parent_id: str | None = None, *, refresh: bool = False
-    ) -> Sequence["Category"]:
+    ) -> Sequence[Category]:
         """Return categories discovered by the provider."""
 
     @abstractmethod
@@ -61,16 +62,16 @@ class BaseProvider(ABC):
         limit: int = 10,
         offset: int = 0,
         refresh: bool = False,
-    ) -> Sequence["ServiceSummary"]:
+    ) -> Sequence[ServiceSummary]:
         """Search services matching the query."""
 
     @abstractmethod
     async def get_service_details(
         self, service_id: str, *, refresh: bool = False
-    ) -> "ServiceDetails":
+    ) -> ServiceDetails:
         """Return full details for a service."""
 
-    async def validate_service(self, service_id: str) -> "ServiceDetails":
+    async def validate_service(self, service_id: str) -> ServiceDetails:
         """Optional hook to force-refresh and validate a service."""
 
         return await self.get_service_details(service_id, refresh=True)

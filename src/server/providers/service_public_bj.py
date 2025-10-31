@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Iterable, List, Sequence
+from typing import Any
 from urllib.parse import urlencode
 
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -101,7 +102,7 @@ class ServicePublicBJProvider(BaseProvider):
     @retry(wait=wait_exponential(multiplier=1, min=1, max=8), stop=stop_after_attempt(3))
     async def list_categories(
         self, parent_id: str | None = None, *, refresh: bool = False
-    ) -> List[Category]:
+    ) -> list[Category]:
         catalog = self._registry_state.ensure_catalog(self.provider_id)
         if not refresh and catalog.categories:
             self._last_category_source = "cache"
@@ -114,7 +115,7 @@ class ServicePublicBJProvider(BaseProvider):
             self._api_path(self._endpoints.portal_root), params={"categories": "true"}
         )
         raw_categories: Sequence[str] = data.get("categories", [])
-        categories: List[Category] = []
+        categories: list[Category] = []
         for order, name in enumerate(raw_categories):
             if not name:
                 continue
@@ -147,12 +148,12 @@ class ServicePublicBJProvider(BaseProvider):
         limit: int | None = None,
         offset: int = 0,
         refresh: bool = False,
-    ) -> List[ServiceSummary]:
+    ) -> list[ServiceSummary]:
         data = await self._get_json(
             self._api_path(self._endpoints.search), params={"query": query}
         )
         services: Sequence[dict[str, Any]] = data.get("services", [])
-        results: List[ServiceSummary] = []
+        results: list[ServiceSummary] = []
         slice_end = offset + limit if limit is not None else None
         for item in services[offset:slice_end]:
             service_id = item.get("id")
@@ -216,7 +217,7 @@ class ServicePublicBJProvider(BaseProvider):
             except ValueError:
                 last_updated = None
 
-        documents: List[DocumentLink] = []
+        documents: list[DocumentLink] = []
         for form in files.get("forms", []) or []:
             title_form = form.get("name") or form.get("formname")
             url = form.get("url")
@@ -243,20 +244,20 @@ class ServicePublicBJProvider(BaseProvider):
                 )
             )
 
-        requirements: List[Requirement] = []
+        requirements: list[Requirement] = []
         docs_text = m_service.get("mDocuments") or ""
         for block in docs_text.split("\n"):
             cleaned = block.strip().lstrip("*").strip()
             if cleaned:
                 requirements.append(Requirement(title=cleaned))
 
-        steps: List[Step] = []
+        steps: list[Step] = []
         process_text = m_service.get("mProcess") or ""
         if process_text.strip():
             for idx, block in enumerate(filter(None, process_text.split("\n\n")), start=1):
                 steps.append(Step(title=f"Étape {idx}", content=block.strip()))
 
-        contacts: List[ContactPoint] = []
+        contacts: list[ContactPoint] = []
         for channel in overview.get("Channelssp") or []:
             contacts.append(ContactPoint(label="Canal", value=channel))
         owner = overview.get("ownedBy")

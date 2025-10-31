@@ -1,7 +1,7 @@
 import pytest
 
 from server.config import Settings
-from server.models import ServiceDetails, ServiceSummary, Category
+from server.models import Category, ServiceDetails, ServiceSummary
 from server.providers import ProviderRegistry
 from server.providers.base import BaseProvider
 from server.registry import RegistryState

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Sequence
 
 from pydantic import AnyHttpUrl, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
         alias="SP_USER_AGENT",
         description="User-Agent header presented to remote servers.",
     )
-    enabled_providers: List[str] = Field(
+    enabled_providers: list[str] = Field(
         default_factory=lambda: ["service-public-bj"],
         alias="ENABLED_PROVIDERS",
         description="Comma-separated list of provider identifiers to enable.",
@@ -68,7 +68,7 @@ class Settings(BaseSettings):
 
     @field_validator("enabled_providers", mode="before")
     @classmethod
-    def _split_providers(cls, value: Sequence[str] | str | None) -> List[str]:
+    def _split_providers(cls, value: Sequence[str] | str | None) -> list[str]:
         if value is None:
             return ["service-public-bj"]
         if isinstance(value, str):

@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 import logging
+from pathlib import Path
+
+from .config import Settings
+from .health import ScraperHealthMonitor
+from .providers import ProviderInitialisationError, ProviderRegistry, ServicePublicBJProvider
+from .registry import RegistryState, RegistryStore
 
 logger = logging.getLogger(__name__)
-
-from .config import Settings, get_settings
-from .health import ScraperHealthMonitor
-from .providers import ProviderRegistry, ProviderInitialisationError, ServicePublicBJProvider
-from .registry import RegistryState, RegistryStore
 
 
 def load_registry_state(settings: Settings) -> tuple[RegistryState, RegistryStore]:

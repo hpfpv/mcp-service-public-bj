@@ -5,15 +5,17 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import time
 from asyncio import Lock
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
-from typing import Any, Awaitable, Callable, Dict
+from typing import Any
 
 import uvicorn
 from mcp import types
 from mcp.server.lowlevel import server as lowlevel_server
-from mcp.server.streamable_http import StreamableHTTPServerTransport
 from mcp.server.stdio import stdio_server
+from mcp.server.streamable_http import StreamableHTTPServerTransport
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -22,6 +24,7 @@ from starlette.routing import Route
 from .bootstrap import initialise_providers, load_registry_state, shutdown_providers
 from .config import Settings, get_settings
 from .health import ScraperHealthMonitor
+from .metrics import metrics_payload, record_http_request
 from .providers import ProviderRegistry
 from .registry import RegistryState, RegistryStore
 from .schemas import (
@@ -110,7 +113,7 @@ class MCPServerRuntime:
         self._initialization_options = self._app.create_initialization_options()
 
     @classmethod
-    async def create(cls, settings: Settings) -> "MCPServerRuntime":
+    async def create(cls, settings: Settings) -> MCPServerRuntime:
         registry_state, registry_store = load_registry_state(settings)
         health_monitor = ScraperHealthMonitor()
         registry = await initialise_providers(settings, registry_state, health_monitor)
@@ -136,7 +139,7 @@ class MCPServerRuntime:
         async def _list_tools(_: types.ListToolsRequest | None = None) -> types.ListToolsResult:
             return types.ListToolsResult(tools=self._tool_definitions)
 
-        async def handle_list_categories(arguments: Dict[str, Any]) -> Dict[str, Any]:
+        async def handle_list_categories(arguments: dict[str, Any]) -> dict[str, Any]:
             return await list_categories_tool(
                 self.registry,
                 self.registry_state,
@@ -146,7 +149,7 @@ class MCPServerRuntime:
                 persist_state=self.persist_state,
             )
 
-        async def handle_search_services(arguments: Dict[str, Any]) -> Dict[str, Any]:
+        async def handle_search_services(arguments: dict[str, Any]) -> dict[str, Any]:
             return await search_services_tool(
                 self.registry,
                 self.registry_state,
@@ -159,7 +162,7 @@ class MCPServerRuntime:
                 persist_state=self.persist_state,
             )
 
-        async def handle_get_details(arguments: Dict[str, Any]) -> Dict[str, Any]:
+        async def handle_get_details(arguments: dict[str, Any]) -> dict[str, Any]:
             return await get_service_details_tool(
                 self.registry,
                 self.registry_state,
@@ -169,7 +172,7 @@ class MCPServerRuntime:
                 persist_state=self.persist_state,
             )
 
-        async def handle_validate_service(arguments: Dict[str, Any]) -> Dict[str, Any]:
+        async def handle_validate_service(arguments: dict[str, Any]) -> dict[str, Any]:
             return await validate_service_tool(
                 self.registry,
                 self.registry_state,
@@ -178,14 +181,14 @@ class MCPServerRuntime:
                 persist_state=self.persist_state,
             )
 
-        async def handle_get_status(arguments: Dict[str, Any]) -> Dict[str, Any]:
+        async def handle_get_status(arguments: dict[str, Any]) -> dict[str, Any]:
             return await get_scraper_status_tool(
                 self.registry,
                 self.registry_state,
                 provider_id=arguments.get("provider_id"),
             )
 
-        tool_handlers: Dict[str, Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]] = {
+        tool_handlers: dict[str, Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = {
             "list_categories": handle_list_categories,
             "search_services": handle_search_services,
             "get_service_details": handle_get_details,
@@ -194,7 +197,7 @@ class MCPServerRuntime:
         }
 
         @app.call_tool()
-        async def _call_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        async def _call_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             handler = tool_handlers.get(tool_name)
             if handler is None:
                 raise ValueError(f"Unknown tool '{tool_name}'")
@@ -250,15 +253,12 @@ async def serve_stdio(settings: Settings) -> None:
             logger.debug("Runtime shutdown cancelled during stdio exit.")
 
 
-async def serve_http(
+def build_http_app(
+    runtime: MCPServerRuntime,
     settings: Settings,
     *,
-    host: str,
-    port: int,
-    log_level: str,
     json_response: bool = False,
-) -> None:
-    runtime = await MCPServerRuntime.create(settings)
+):
     transport = StreamableHTTPServerTransport(
         mcp_session_id=None,
         is_json_response_enabled=json_response,
@@ -291,8 +291,13 @@ async def serve_http(
             }
         )
 
+    async def metrics_endpoint(_request) -> Response:
+        payload, content_type = metrics_payload()
+        return Response(payload, media_type=content_type)
+
     routes = [
         Route("/healthz", endpoint=health_endpoint, methods=["GET"]),
+        Route("/metrics", endpoint=metrics_endpoint, methods=["GET"]),
     ]
 
     @asynccontextmanager
@@ -304,6 +309,32 @@ async def serve_http(
                 logger.debug("Lifespan cancelled; continuing shutdown.")
 
     app = Starlette(routes=routes, lifespan=graceful_lifespan)
+
+    @app.middleware("http")
+    async def metrics_middleware(request, call_next):
+        start = time.perf_counter()
+        path = request.url.path
+        if path.startswith("/mcp"):
+            path_label = "mcp"
+        elif path == "/metrics":
+            path_label = "metrics"
+        elif path == "/healthz":
+            path_label = "healthz"
+        else:
+            path_label = "other"
+        try:
+            response = await call_next(request)
+        except Exception:
+            record_http_request(request.method, path_label, 500, time.perf_counter() - start)
+            raise
+        status_code = getattr(response, "status_code", 200)
+        record_http_request(
+            request.method,
+            path_label,
+            status_code,
+            time.perf_counter() - start,
+        )
+        return response
 
     async def transport_app(scope, receive, send):
         if scope["type"] != "http":
@@ -325,6 +356,20 @@ async def serve_http(
 
     app.mount("/mcp", transport_app)
     app.mount("/mcp/", transport_app)
+
+    return app, transport
+
+
+async def serve_http(
+    settings: Settings,
+    *,
+    host: str,
+    port: int,
+    log_level: str,
+    json_response: bool = False,
+) -> None:
+    runtime = await MCPServerRuntime.create(settings)
+    app, transport = build_http_app(runtime, settings, json_response=json_response)
 
     config = uvicorn.Config(
         app,

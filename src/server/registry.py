@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
+from collections.abc import MutableMapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, MutableMapping, Sequence
 
 from .models import Category, ServiceDetails, ServiceSummary
 
@@ -16,8 +16,8 @@ class SelectorProfile:
     """Describes the selectors used to parse a given service or category."""
 
     service_id: str
-    css_selectors: Dict[str, str] = field(default_factory=dict)
-    metadata: Dict[str, str] = field(default_factory=dict)
+    css_selectors: dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -25,14 +25,14 @@ class ProviderCatalog:
     """Catalog of data for a single provider."""
 
     provider_id: str
-    categories: Dict[str, Category] = field(default_factory=dict)
-    services: Dict[str, ServiceSummary] = field(default_factory=dict)
-    service_details: Dict[str, ServiceDetails] = field(default_factory=dict)
-    selector_profiles: Dict[str, SelectorProfile] = field(default_factory=dict)
-    category_children: MutableMapping[str | None, List[str]] = field(
+    categories: dict[str, Category] = field(default_factory=dict)
+    services: dict[str, ServiceSummary] = field(default_factory=dict)
+    service_details: dict[str, ServiceDetails] = field(default_factory=dict)
+    selector_profiles: dict[str, SelectorProfile] = field(default_factory=dict)
+    category_children: MutableMapping[str | None, list[str]] = field(
         default_factory=lambda: defaultdict(list)
     )
-    services_by_category: MutableMapping[str, List[str]] = field(
+    services_by_category: MutableMapping[str, list[str]] = field(
         default_factory=lambda: defaultdict(list)
     )
 
@@ -92,7 +92,7 @@ class ProviderCatalog:
         }
 
     @classmethod
-    def from_dict(cls, payload: dict[str, object]) -> "ProviderCatalog":
+    def from_dict(cls, payload: dict[str, object]) -> ProviderCatalog:
         provider_id = str(payload.get("provider_id"))
         instance = cls(provider_id=provider_id)
         categories_payload = payload.get("categories", []) or []
@@ -125,7 +125,7 @@ class RegistryState:
     """Container for all provider catalogs."""
 
     def __init__(self) -> None:
-        self.catalogs: Dict[str, ProviderCatalog] = {}
+        self.catalogs: dict[str, ProviderCatalog] = {}
 
     def ensure_catalog(self, provider_id: str) -> ProviderCatalog:
         if provider_id not in self.catalogs:
@@ -156,14 +156,14 @@ class RegistryState:
         catalog = self.ensure_catalog(provider_id)
         return catalog.get_service_details(service_id)
 
-    def categories_for_parent(self, provider_id: str, parent_id: str | None) -> List[Category]:
+    def categories_for_parent(self, provider_id: str, parent_id: str | None) -> list[Category]:
         catalog = self.ensure_catalog(provider_id)
         category_ids = catalog.category_children.get(parent_id, [])
         return [catalog.categories[cid] for cid in category_ids if cid in catalog.categories]
 
-    def breadcrumb(self, provider_id: str, category_id: str) -> List[Category]:
+    def breadcrumb(self, provider_id: str, category_id: str) -> list[Category]:
         catalog = self.ensure_catalog(provider_id)
-        path: List[Category] = []
+        path: list[Category] = []
         current_id: str | None = category_id
         visited = set()
         while current_id:
@@ -177,7 +177,7 @@ class RegistryState:
             current_id = category.parent_id
         return list(reversed(path))
 
-    def services_for_category(self, provider_id: str, category_id: str) -> List[ServiceSummary]:
+    def services_for_category(self, provider_id: str, category_id: str) -> list[ServiceSummary]:
         catalog = self.ensure_catalog(provider_id)
         service_ids = catalog.services_by_category.get(category_id, [])
         return [catalog.services[sid] for sid in service_ids if sid in catalog.services]
@@ -188,7 +188,7 @@ class RegistryState:
         }
 
     @classmethod
-    def from_dict(cls, payload: dict[str, object]) -> "RegistryState":
+    def from_dict(cls, payload: dict[str, object]) -> RegistryState:
         instance = cls()
         provider_payloads = payload.get("providers", []) or []
         for provider_payload in provider_payloads:
