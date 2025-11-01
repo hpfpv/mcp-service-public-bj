@@ -23,7 +23,7 @@ mypy:
 	$(ACTIVATE) && mypy src
 
 test:
-	$(ACTIVATE) && pytest
+	$(ACTIVATE) && PYTHONPATH=src pytest
 
 serve:
 	$(ACTIVATE) && mcp-service-public-bj serve
