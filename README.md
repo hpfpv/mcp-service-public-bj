@@ -12,6 +12,15 @@ This server enables AI assistants to help citizens find information about Benine
 - **Real-time data**: Live scraping ensures information stays current
 - **Smart provider routing**: Queries are routed automatically using provider coverage tags, then priority and fallback logic
 
+## Example Usage
+
+Here's how an AI assistant can help users find information about Beninese public services:
+
+![MCP Service Public BJ Example 1](images/mcp-example-1.png)
+![MCP Service Public BJ Example 2](images/mcp-example-2.png)
+
+*Example: AI assistant helping a user find information about passport renewal procedures using the MCP server*
+
 ## Quick Start
 
 ### Prerequisites
