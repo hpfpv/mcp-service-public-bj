@@ -368,7 +368,7 @@ The server supports both **stdio** (single client) and **HTTP** (multi-client) t
       "command": "docker",
       "args": [
         "run", "--rm", "-i",
-        "mcp-service-public-bj:latest"
+        "ghcr.io/hpfpv/mcp-service-public-bj:latest"
       ]
     }
   }
@@ -399,7 +399,7 @@ The server supports both **stdio** (single client) and **HTTP** (multi-client) t
       "command": "docker",
       "args": [
         "run", "--rm", "-i",
-        "mcp-service-public-bj:latest"
+        "ghcr.io/hpfpv/mcp-service-public-bj:latest"
       ]
     }
   }
