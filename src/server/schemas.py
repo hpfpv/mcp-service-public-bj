@@ -1,7 +1,7 @@
 """JSON Schema definitions for MCP tools."""
 
 from __future__ import annotations
-from typing import cast, Dict, Any
+from typing import cast, Any
 
 CATEGORY_SCHEMA = {
     "type": "object",
@@ -100,7 +100,7 @@ SERVICE_SUMMARY_SCHEMA = {
 SERVICE_DETAILS_SCHEMA = {
     "type": "object",
     "properties": {
-        **cast(Dict[str, Any], SERVICE_SUMMARY_SCHEMA["properties"]),
+        **cast(dict[str, Any], SERVICE_SUMMARY_SCHEMA["properties"]),
         "summary": {"type": ["string", "null"]},
         "last_updated": {"type": ["string", "null"], "format": "date-time"},
         "steps": {"type": "array", "items": STEP_SCHEMA},
