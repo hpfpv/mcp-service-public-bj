@@ -1,7 +1,8 @@
 """JSON Schema definitions for MCP tools."""
 
 from __future__ import annotations
-from typing import cast, Any
+
+from typing import Any, cast
 
 CATEGORY_SCHEMA = {
     "type": "object",
