@@ -134,3 +134,4 @@ MCP_FINANCES_BASE_URL=https://finances.bj/
 ## License
 
 MIT License - see [LICENSE](LICENSE) file.
+
