@@ -1,7 +1,6 @@
 name: Release
 
 on:
-  workflow_dispatch:
   push:
     tags:
       - 'v*'
@@ -9,149 +8,146 @@ on:
 permissions:
   contents: write
   packages: write
-  attestations: write
   id-token: write
+  attestations: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-python:
+    name: Build Python Package
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Determine version
+      - name: Extract version
         id: version
         run: |
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          else
-            VERSION=$(python3 - <<'PY'
-import re
-from pathlib import Path
-text = Path('pyproject.toml').read_text()
-match = re.search(r'version\s*=\s*"([^"]+)"', text)
-if not match:
-    raise SystemExit('Unable to determine version from pyproject.toml')
-print(match.group(1))
-PY
-            )
-          fi
+          VERSION="${GITHUB_REF_NAME#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
+          cache: 'pip'
 
-      - name: Install build tooling
+      - name: Install build tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install build cibuildwheel==2.16.5
+          python -m pip install build
 
-      - name: Build sdist and wheel
-        run: python -m build --sdist --wheel --outdir dist
+      - name: Build package
+        run: |
+          mkdir -p dist
+          python -m build --sdist --wheel --outdir dist
 
-      - name: Build platform wheels (cp310)
-        env:
-          CIBW_BUILD: cp310-manylinux*
-          CIBW_ARCHS_LINUX: "x86_64 aarch64"
-          CIBW_BUILD_VERBOSITY: "1"
-        run: cibuildwheel --platform linux --output-dir dist
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'dist/*'
 
-      - name: Show artifacts
-        run: ls -R dist
-
-      - name: Upload distribution artifacts
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-dist
+          name: python-package
           path: dist/*
+          if-no-files-found: error
 
-      - name: Generate build provenance
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: "dist/*"
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
+  create-release:
+    name: Create GitHub Release
     needs: build-python
+    runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
-          name: python-dist
+          name: python-package
           path: dist
 
-      - name: Generate checksums
+      - name: Create checksums
         run: |
           cd dist
-          sha256sum * > SHA256SUMS
+          sha256sum * > checksums.txt
+          cat checksums.txt
 
-      - name: Create GitHub release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
           generate_release_notes: true
           files: |
             dist/*
+          fail_on_unmatched_files: true
 
-  docker:
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
+  build-docker:
+    name: Build and Push Docker Image
     needs: build-python
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Download wheel artifacts
-        uses: actions/download-artifact@v4
+      - name: Download Python package
+        uses: actions/download-artifact@v5
         with:
-          name: python-dist
+          name: python-package
           path: dist
 
-      - name: Select universal wheel
+      - name: Select wheel file
         id: wheel
         run: |
-          WHEEL=$(ls dist/*py3-none-any.whl | head -n 1)
+          WHEEL=$(find dist -name "*py3-none-any.whl" | head -n 1)
           if [ -z "$WHEEL" ]; then
-            WHEEL=$(ls dist/*.whl | head -n 1)
+            echo "Error: No universal wheel found"
+            exit 1
           fi
-          echo "wheel=$WHEEL" >> "$GITHUB_OUTPUT"
+          echo "wheel=$(basename "$WHEEL")" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-qemu-action@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-      - uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR
+      - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute image tags
-        id: tags
-        run: |
-          VERSION=${{ needs.build-python.outputs.version }}
-          MAJOR=${VERSION%%.*}
-          MINOR=${VERSION%.*}
-          REPO=ghcr.io/${{ github.repository }}
-          echo "version=$REPO:${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "minor=$REPO:${MINOR}" >> "$GITHUB_OUTPUT"
-          echo "major=$REPO:${MAJOR}" >> "$GITHUB_OUTPUT"
-          echo "latest=$REPO:latest" >> "$GITHUB_OUTPUT"
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
 
-      - name: Build and push Docker images
-        uses: docker/build-push-action@v5
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.release
-          build-args: |
-            WHEEL_FILE=${{ steps.wheel.outputs.wheel }}
+          file: ./Dockerfile.release
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ steps.tags.outputs.version }}
-            ${{ steps.tags.outputs.minor }}
-            ${{ steps.tags.outputs.major }}
-            ${{ steps.tags.outputs.latest }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            WHEEL_FILE=dist/${{ steps.wheel.outputs.wheel }}
+            VERSION=${{ needs.build-python.outputs.version }}
+          provenance: false
+          sbom: false
