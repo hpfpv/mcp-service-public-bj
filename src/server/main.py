@@ -32,6 +32,8 @@ from .schemas import (
     GET_SERVICE_DETAILS_OUTPUT_SCHEMA,
     LIST_CATEGORIES_INPUT_SCHEMA,
     LIST_CATEGORIES_OUTPUT_SCHEMA,
+    LIST_PROVIDERS_INPUT_SCHEMA,
+    LIST_PROVIDERS_OUTPUT_SCHEMA,
     SCRAPER_STATUS_INPUT_SCHEMA,
     SCRAPER_STATUS_OUTPUT_SCHEMA,
     SEARCH_SERVICES_INPUT_SCHEMA,
@@ -42,6 +44,7 @@ from .tools import (
     get_scraper_status_tool,
     get_service_details_tool,
     list_categories_tool,
+    list_providers_tool,
     search_services_tool,
     validate_service_tool,
 )
@@ -51,6 +54,13 @@ logger = logging.getLogger(__name__)
 
 def _build_tool_definitions() -> list[types.Tool]:
     return [
+        types.Tool(
+            name="list_providers",
+            title="Lister les fournisseurs",
+            description="Retourne les fournisseurs disponibles et leurs métadonnées (priorité, couverture).",
+            inputSchema=LIST_PROVIDERS_INPUT_SCHEMA,
+            outputSchema=LIST_PROVIDERS_OUTPUT_SCHEMA,
+        ),
         types.Tool(
             name="list_categories",
             title="Lister les catégories",
@@ -82,7 +92,7 @@ def _build_tool_definitions() -> list[types.Tool]:
         types.Tool(
             name="get_scraper_status",
             title="Statut du scraper",
-            description="Affiche l'état du scraper et les statistiques du registre local.",
+            description="Affiche l'état des scrapers et les statistiques du registre pour chaque fournisseur.",
             inputSchema=SCRAPER_STATUS_INPUT_SCHEMA,
             outputSchema=SCRAPER_STATUS_OUTPUT_SCHEMA,
         ),
@@ -129,15 +139,18 @@ class MCPServerRuntime:
             name="mcp-service-public-bj",
             version="0.1.0",
             instructions=(
-                "Ce serveur MCP fournit un accès en direct aux informations du site "
-                "service-public.bj, y compris la recherche de services, les détails de procédures "
-                "et l'état du scraper."
+                "Ce serveur MCP fournit un accès en direct aux informations des portails "
+                "service-public.bj et finances.bj, y compris la recherche de services, les détails "
+                "de procédures et l'état des scrapers."
             ),
         )
 
         @app.list_tools()
         async def _list_tools(_: types.ListToolsRequest | None = None) -> types.ListToolsResult:
             return types.ListToolsResult(tools=self._tool_definitions)
+
+        async def handle_list_providers(_: dict[str, Any]) -> dict[str, Any]:
+            return await list_providers_tool(self.registry)
 
         async def handle_list_categories(arguments: dict[str, Any]) -> dict[str, Any]:
             return await list_categories_tool(
@@ -189,6 +202,7 @@ class MCPServerRuntime:
             )
 
         tool_handlers: dict[str, Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = {
+            "list_providers": handle_list_providers,
             "list_categories": handle_list_categories,
             "search_services": handle_search_services,
             "get_service_details": handle_get_details,

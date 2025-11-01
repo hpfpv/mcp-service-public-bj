@@ -30,6 +30,11 @@ class Settings(BaseSettings):
         alias="SP_CACHE_DIR",
         description="Directory used for lightweight cache or registry persistence.",
     )
+    finances_base_url: AnyHttpUrl = Field(
+        default="https://finances.bj/",
+        alias="FINANCES_BASE_URL",
+        description="Base URL for finances.bj WordPress API.",
+    )
     concurrency: int = Field(
         default=2,
         alias="SP_CONCURRENCY",
@@ -54,9 +59,14 @@ class Settings(BaseSettings):
         description="User-Agent header presented to remote servers.",
     )
     enabled_providers: list[str] = Field(
-        default_factory=lambda: ["service-public-bj"],
+        default_factory=lambda: ["service-public-bj", "finances-bj"],
         alias="ENABLED_PROVIDERS",
         description="Comma-separated list of provider identifiers to enable.",
+    )
+    provider_priorities: dict[str, int] = Field(
+        default_factory=dict,
+        alias="PROVIDER_PRIORITIES",
+        description="Comma-separated mapping of provider priorities (e.g. service-public-bj:100,finances-bj:80).",
     )
 
     model_config = SettingsConfigDict(
@@ -70,11 +80,36 @@ class Settings(BaseSettings):
     @classmethod
     def _split_providers(cls, value: Sequence[str] | str | None) -> list[str]:
         if value is None:
-            return ["service-public-bj"]
+            return ["service-public-bj", "finances-bj"]
         if isinstance(value, str):
             candidates = [item.strip() for item in value.split(",")]
             return [item for item in candidates if item]
         return list(value)
+
+    @field_validator("provider_priorities", mode="before")
+    @classmethod
+    def _parse_priorities(cls, value: dict[str, int] | str | None) -> dict[str, int]:
+        if value is None or value == "":
+            return {}
+        if isinstance(value, dict):
+            return value
+        priorities: dict[str, int] = {}
+        for item in value.split(","):
+            item = item.strip()
+            if not item:
+                continue
+            if ":" not in item:
+                continue
+            provider_id, _, priority_str = item.partition(":")
+            provider_id = provider_id.strip()
+            priority_str = priority_str.strip()
+            if not provider_id or not priority_str:
+                continue
+            try:
+                priorities[provider_id] = int(priority_str)
+            except ValueError:
+                continue
+        return priorities
 
 
 @lru_cache(maxsize=1)

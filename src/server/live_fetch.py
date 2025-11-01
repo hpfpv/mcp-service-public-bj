@@ -118,3 +118,49 @@ class LiveFetchClient:
                     cache_hit=cache_hit,
                 )
             return text
+
+    async def fetch_response(self, url: str, *, use_cache: bool = False) -> httpx.Response:
+        """Fetch the URL and return the full HTTP response object."""
+
+        absolute_url = self._absolute_url(url)
+        start = time.perf_counter()
+        try:
+            async with self._semaphore:
+                response = await self._client.get(absolute_url)
+            response.raise_for_status()
+        except Exception as exc:  # pragma: no cover - network errors
+            record_fetch(
+                provider=self._provider_id,
+                cache_hit=False,
+                outcome="error",
+                duration_seconds=time.perf_counter() - start,
+            )
+            if self._monitor:
+                duration_ms = (time.perf_counter() - start) * 1000
+                self._monitor.record_fetch(
+                    provider_id=self._provider_id,
+                    duration_ms=duration_ms,
+                    success=False,
+                    cache_hit=False,
+                    error_message=str(exc),
+                )
+            raise
+        else:
+            duration_seconds = time.perf_counter() - start
+            record_fetch(
+                provider=self._provider_id,
+                cache_hit=False,
+                outcome="success",
+                duration_seconds=duration_seconds,
+            )
+            if self._monitor:
+                duration_ms = duration_seconds * 1000
+                self._monitor.record_fetch(
+                    provider_id=self._provider_id,
+                    duration_ms=duration_ms,
+                    success=True,
+                    cache_hit=False,
+                )
+            if use_cache and self._cache:
+                await self._cache.set(absolute_url, response.text)
+            return response

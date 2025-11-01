@@ -22,13 +22,15 @@ The MCP Service Public BJ server is built with a hybrid architecture that combin
 #### 1. MCP Server (`src/server/main.py`)
 - **Framework**: Built on `mcp>=1.19.0` Python package
 - **Transports**: Supports both stdio and HTTP (streamable)
-- **Tools**: Exposes 5 main tools via JSON-RPC
+- **Tools**: Exposes 6 main tools via JSON-RPC (including provider discovery)
 - **Concurrency**: Async event loop with configurable limits
 
 #### 2. Provider System (`src/server/providers/`)
 - **Base Provider**: Abstract interface for data sources
-- **Service Public BJ Provider**: Implements live API scraping
-- **Registry Pattern**: Pluggable architecture for multiple sources
+- **Service Public BJ Provider**: Implements live API scraping of service-public.bj
+- **Finances BJ Provider**: Integrates finances.bj WordPress JSON endpoints
+- **Provider descriptors**: Metadata (description, coverage tags, priority, supported tools) registered alongside instances
+- **Registry Pattern**: Pluggable architecture for multiple sources with intelligent routing
 
 #### 3. Live Fetch Engine (`src/server/live_fetch.py`)
 - **HTTP Client**: `httpx` with HTTP/2 support
@@ -113,6 +115,9 @@ Key environment variables:
 - `MCP_SP_CONCURRENCY`: Max concurrent requests (default: 2)
 - `MCP_SP_TIMEOUT`: HTTP timeout in seconds (default: 30)
 - `MCP_SP_CACHE_TTL`: Cache lifetime in seconds (default: 300)
+- `MCP_FINANCES_BASE_URL`: Override finances.bj endpoint (default: https://finances.bj/)
+- `MCP_ENABLED_PROVIDERS`: Comma-separated provider IDs to load (e.g. `service-public-bj,finances-bj`)
+- `MCP_PROVIDER_PRIORITIES`: Optional comma-separated mapping `provider_id:priority` (higher = tried earlier for fallback)
 
 ### 3. Development Commands
 ```bash
@@ -157,6 +162,17 @@ mcp-service-public-bj/
 
 ### MCP Tools
 
+#### `list_providers`
+```json
+{
+  "tool": "list_providers",
+  "arguments": {}
+}
+```
+
+- **Purpose**: Discover the configured providers, their descriptions, priorities, coverage tags, and supported tools.
+- **Usage**: Clients can use this metadata to choose the right provider before invoking domain-specific tools.
+
 #### `list_categories`
 ```json
 {
@@ -194,6 +210,20 @@ mcp-service-public-bj/
 }
 ```
 
+#### `validate_service`
+Identical arguments to `get_service_details`; forces a live refetch and returns `validated: true` when successful.
+
+#### `get_scraper_status`
+Returns an array of provider status objects including registry counters and the provider descriptor metadata. Use this to monitor provider health and verify routing priorities.
+
+### Provider Routing & Fallback
+
+- When a tool call includes `provider_id`, the request is sent directly to that provider with no fallback.
+- When `provider_id` is omitted, providers are ranked using fuzzy matching between the query (and other relevant arguments) and the provider `coverage_tags`. Providers with the highest tag match are tried first; ties fall back to priority order (`MCP_PROVIDER_PRIORITIES`).
+- Each provider is attempted live, falls back to its cache, and on failure the next provider is tried.
+- Responses include a `warnings` array summarising providers that were skipped (errors or empty responses) so clients can surface diagnostics.
+- Use `list_providers` or `get_scraper_status` before issuing domain tools to understand the available providers and their priorities.
+
 ### HTTP Endpoints (when using serve-http)
 
 - `GET /healthz` - Health check
@@ -223,6 +253,9 @@ pytest --cov=src --cov-report=html
 # Specific test categories
 pytest tests/test_registry.py -v
 pytest tests/test_service_public_provider.py -k "test_search"
+
+# Optional: live HTTP e2e against a running server
+RUN_LIVE_HTTP_E2E=1 MCP_LIVE_HTTP_URL=http://localhost:8000/mcp pytest tests/test_live_http_e2e.py -v
 ```
 
 ### Test Configuration
@@ -257,6 +290,47 @@ curl http://localhost:8000/healthz
 # Get detailed provider status
 mcp-service-public-bj status --live
 ```
+
+## Operational Runbooks
+
+### Rotate the Registry Cache Volume
+The registry cache under `data/registry/` can grow as new services are indexed. To rotate or reset it safely:
+
+1. **Pause traffic**: Stop the MCP server (or scale replicas to zero) to avoid writes during rotation.
+2. **Archive the current snapshot**:
+   ```bash
+   ts=$(date +%Y%m%d-%H%M%S)
+   tar -czf registry-$ts.tgz data/registry
+   ```
+3. **Prune old snapshots**: Retain up to five archives to honor the historical snapshot requirement.
+   ```bash
+   ls -1 registry-*.tgz | sort -r | tail -n +6 | xargs -I{} rm {}
+   ```
+4. **Reset the active cache**: Remove only JSON payloads; keep `.gitkeep` if tracked.
+   ```bash
+   rm -f data/registry/*.json
+   ```
+5. **Resume service**: Restart the MCP server. The next live scrape repopulates the cache on demand.
+
+*Docker deployment*: mount `/app/data/registry` as a named volume (`-v registry_data:/app/data/registry`) so rotation can be done from the host while the container is stopped.
+
+### Onboard an Additional Provider
+To expose a new website via the MCP server:
+
+1. **Create a provider module** in `src/server/providers/` that subclasses `BaseProvider`. Follow the structure in `service_public_bj.py`:
+   - Implement `list_categories`, `search_services`, `get_service_details`, and `validate_service`.
+   - Use `LiveFetchClient` for rate-limited HTTP access; configure base URL via `Settings`.
+2. **Register the provider** in `src/server/providers/__init__.py` by adding it to `PROVIDER_FACTORIES`. Ensure it has a unique `provider_id`.
+3. **Extend configuration**:
+   - Add environment variables (e.g., `MCP_SP_<PROVIDER>_BASE_URL`) to `.env.example`.
+   - Document flags in this guide and README if user-facing.
+4. **Add tests**:
+   - Unit tests for parsing and transformation logic.
+  - Integration tests using `respx` or fixtures to mock the upstream JSON/API.
+  - Update `tests/test_http_e2e.py` and `tests/test_stdio_e2e.py` if the new provider changes default tool behavior.
+5. **Update documentation**: Describe the provider capabilities, rate limits, and any additional tools it introduces.
+
+Remember to update the Docker image if new dependencies are required; rebuild with `docker build -t mcp-service-public-bj .`.
 
 ## Integration Patterns
 

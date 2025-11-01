@@ -6,10 +6,11 @@ An MCP (Model Context Protocol) server that provides AI assistants with access t
 
 This server enables AI assistants to help citizens find information about Beninese government services, procedures, and requirements. It provides:
 
-- **Service search**: Find government services by keywords
-- **Category browsing**: Explore services by thematic areas
+- **Service search**: Find government and finance services by keywords
+- **Category browsing**: Explore services by thematic areas across enabled providers
 - **Detailed procedures**: Get step-by-step instructions, required documents, and contact information
 - **Real-time data**: Live scraping ensures information stays current
+- **Smart provider routing**: Queries are routed automatically using provider coverage tags, then priority and fallback logic
 
 ## Quick Start
 
@@ -90,10 +91,13 @@ docker run --rm -p 8000:8000 mcp-service-public-bj serve-http --host 0.0.0.0
 
 | Tool | Purpose | Example |
 |------|---------|---------|
+| `list_providers` | Discover available providers, coverage tags, priority and supported tools | Inspect routing candidates |
 | `list_categories` | Browse service categories | Get all thematic areas |
-| `search_services` | Find services by keywords | Search "carte identité" |
+| `search_services` | Find services by keywords (auto-routing between providers) | Search "autorisation change" |
 | `get_service_details` | Get complete procedure info | Full passport renewal guide |
-| `get_scraper_status` | Check system health | Cache stats, provider status |
+| `get_scraper_status` | Check per-provider health and registry counters | Cache stats, provider status |
+
+When a tool call omits `provider_id`, the server automatically routes the request using provider coverage tags (fuzzy match between query and tags). Providers whose tags best match the query are attempted first; ties fall back to priority ordering. If a provider fails or returns no results, the server transparently falls back to the next candidate and reports the attempted providers in the `warnings` field. Clients can preload routing hints via `list_providers` and send `provider_id` explicitly to pin a source.
 
 ## Configuration
 
@@ -110,12 +114,22 @@ MCP_SP_CACHE_DIR=/path/to/cache
 MCP_SP_CONCURRENCY=2
 MCP_SP_TIMEOUT=30
 MCP_SP_CACHE_TTL=300
+
+# Enable providers (comma-separated)
+MCP_ENABLED_PROVIDERS=service-public-bj,finances-bj
+
+# Override finances.bj base URL if required
+MCP_FINANCES_BASE_URL=https://finances.bj/
+
+# Optional priority overrides (higher = earlier fallback)
+# MCP_PROVIDER_PRIORITIES=service-public-bj:100,finances-bj:80
 ```
 
 ## Documentation
 
 - **[Developer Guide](docs/developer-guide.md)** - Technical details, architecture, testing
 - **[Release Guide](docs/release-guide.md)** - Deployment and release process
+- Operational runbooks (cache rotation, provider onboarding) are covered in the Developer Guide
 
 ## License
 

@@ -29,7 +29,7 @@ serve:
 	$(ACTIVATE) && mcp-service-public-bj serve
 
 serve-http:
-	$(ACTIVATE) && mcp-service-public-bj serve-http $(ARGS)
+	$(ACTIVATE) && mcp-service-public-bj serve-http --host 0.0.0.0 --port 8000 $(ARGS)
 
 scrape:
 	$(ACTIVATE) && mcp-service-public-bj scrape $(ARGS)

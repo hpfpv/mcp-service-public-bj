@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field
 from typing import Any
 
 from ..config import Settings
@@ -26,6 +27,18 @@ class ProviderError(Exception):
 
 class ProviderInitialisationError(ProviderError):
     """Raised when a provider cannot initialise correctly."""
+
+
+@dataclass(frozen=True)
+class ProviderDescriptor:
+    """Metadata describing a provider for discovery and routing."""
+
+    id: str
+    name: str
+    description: str
+    priority: int = 0
+    coverage_tags: tuple[str, ...] = field(default_factory=tuple)
+    supported_tools: tuple[str, ...] = field(default_factory=tuple)
 
 
 class BaseProvider(ABC):
@@ -94,13 +107,19 @@ class ProviderRegistry:
 
     def __init__(self) -> None:
         self._providers: dict[str, BaseProvider] = {}
+        self._descriptors: dict[str, ProviderDescriptor] = {}
 
-    def register(self, provider: BaseProvider) -> None:
+    def register(self, provider: BaseProvider, descriptor: ProviderDescriptor) -> None:
         if provider.provider_id in self._providers:
             raise ProviderInitialisationError(
                 f"Provider '{provider.provider_id}' already registered."
             )
+        if descriptor.id != provider.provider_id:
+            raise ProviderInitialisationError(
+                f"Descriptor id '{descriptor.id}' does not match provider id '{provider.provider_id}'."
+            )
         self._providers[provider.provider_id] = provider
+        self._descriptors[provider.provider_id] = descriptor
 
     def get(self, provider_id: str) -> BaseProvider:
         try:
@@ -108,8 +127,25 @@ class ProviderRegistry:
         except KeyError as exc:  # pragma: no cover - defensive path
             raise ProviderError(f"Provider '{provider_id}' not registered.") from exc
 
+    def get_descriptor(self, provider_id: str) -> ProviderDescriptor:
+        try:
+            return self._descriptors[provider_id]
+        except KeyError as exc:  # pragma: no cover - defensive path
+            raise ProviderError(f"Provider '{provider_id}' descriptor missing.") from exc
+
     def all(self) -> Iterable[BaseProvider]:
         return self._providers.values()
 
+    def descriptors(self) -> Iterable[ProviderDescriptor]:
+        return self._descriptors.values()
+
+    def ordered_descriptors(self) -> list[ProviderDescriptor]:
+        return sorted(
+            self._descriptors.values(),
+            key=lambda descriptor: descriptor.priority,
+            reverse=True,
+        )
+
     def clear(self) -> None:
         self._providers.clear()
+        self._descriptors.clear()

@@ -58,6 +58,26 @@ CONTACT_POINT_SCHEMA = {
     "additionalProperties": False,
 }
 
+PROVIDER_DESCRIPTOR_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "description": {"type": "string"},
+        "priority": {"type": "integer"},
+        "coverage_tags": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "supported_tools": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+    },
+    "required": ["id", "name", "description", "priority"],
+    "additionalProperties": False,
+}
+
 SERVICE_SUMMARY_SCHEMA = {
     "type": "object",
     "properties": {
@@ -124,13 +144,30 @@ LIST_CATEGORIES_OUTPUT_SCHEMA = {
     "additionalProperties": False,
 }
 
+LIST_PROVIDERS_INPUT_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+}
+
+LIST_PROVIDERS_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "providers": {
+            "type": "array",
+            "items": PROVIDER_DESCRIPTOR_SCHEMA,
+        }
+    },
+    "required": ["providers"],
+    "additionalProperties": False,
+}
+
 SEARCH_SERVICES_INPUT_SCHEMA = {
     "type": "object",
     "properties": {
         "provider_id": {"type": "string"},
         "query": {"type": "string"},
         "category_id": {"type": "string"},
-        "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+        "limit": {"type": "integer", "minimum": 1},
         "offset": {"type": "integer", "minimum": 0},
         "refresh": {"type": "boolean"},
     },
@@ -199,7 +236,7 @@ SCRAPER_STATUS_INPUT_SCHEMA = {
     "additionalProperties": False,
 }
 
-SCRAPER_STATUS_OUTPUT_SCHEMA = {
+SCRAPER_STATUS_ITEM_SCHEMA = {
     "type": "object",
     "properties": {
         "provider_id": {"type": "string"},
@@ -213,7 +250,20 @@ SCRAPER_STATUS_OUTPUT_SCHEMA = {
             "required": ["categories_indexed", "services_indexed"],
             "additionalProperties": False,
         },
+        "descriptor": PROVIDER_DESCRIPTOR_SCHEMA,
     },
-    "required": ["provider_id", "status", "registry"],
+    "required": ["provider_id", "status", "registry", "descriptor"],
+    "additionalProperties": False,
+}
+
+SCRAPER_STATUS_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "providers": {
+            "type": "array",
+            "items": SCRAPER_STATUS_ITEM_SCHEMA,
+        }
+    },
+    "required": ["providers"],
     "additionalProperties": False,
 }

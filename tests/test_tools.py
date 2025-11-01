@@ -2,13 +2,14 @@ import pytest
 
 from server.config import Settings
 from server.models import Category, ServiceDetails, ServiceSummary
-from server.providers import ProviderRegistry
+from server.providers import ProviderDescriptor, ProviderRegistry
 from server.providers.base import BaseProvider
 from server.registry import RegistryState
 from server.tools import (
     get_scraper_status_tool,
     get_service_details_tool,
     list_categories_tool,
+    list_providers_tool,
     search_services_tool,
     validate_service_tool,
 )
@@ -77,7 +78,23 @@ async def test_tool_routing(tmp_path):
     settings = Settings(cache_dir=tmp_path, base_url="https://example.com")
     registry = ProviderRegistry()
     provider = DummyProvider(settings)
-    registry.register(provider)
+    registry.register(
+        provider,
+        ProviderDescriptor(
+            id="dummy",
+            name="Dummy",
+            description="Dummy provider for tests",
+            priority=50,
+            coverage_tags=("test",),
+            supported_tools=(
+                "list_categories",
+                "search_services",
+                "get_service_details",
+                "validate_service",
+                "get_scraper_status",
+            ),
+        ),
+    )
     registry_state = RegistryState()
 
     persist_calls = {"count": 0}
@@ -125,7 +142,10 @@ async def test_tool_routing(tmp_path):
     assert validated["source"] == "live"
 
     status = await get_scraper_status_tool(registry, registry_state)
-    assert status["provider_id"] == "dummy"
-    assert status["registry"]["categories_indexed"] == 0
+    assert status["providers"][0]["provider_id"] == "dummy"
+    assert status["providers"][0]["registry"]["categories_indexed"] == 0
+
+    providers_listing = await list_providers_tool(registry)
+    assert providers_listing["providers"][0]["id"] == "dummy"
 
     assert persist_calls["count"] == 4

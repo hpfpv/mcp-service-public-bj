@@ -8,7 +8,7 @@ from mcp.shared.message import SessionMessage
 from server.config import Settings
 from server.main import MCPServerRuntime
 from server.models import Category, ServiceDetails, ServiceSummary
-from server.providers import ProviderRegistry
+from server.providers import ProviderDescriptor, ProviderRegistry
 from server.providers.base import BaseProvider
 from server.registry import RegistryState
 
@@ -94,7 +94,24 @@ async def test_stdio_runtime_end_to_end(tmp_path):
 
     registry_state = RegistryState()
     registry = ProviderRegistry()
-    registry.register(StdioStubProvider(settings, data))
+    stdio_provider = StdioStubProvider(settings, data)
+    registry.register(
+        stdio_provider,
+        ProviderDescriptor(
+            id=stdio_provider.provider_id,
+            name=stdio_provider.display_name,
+            description="Stub provider for stdio e2e tests",
+            priority=100,
+            coverage_tags=("test",),
+            supported_tools=(
+                "list_categories",
+                "search_services",
+                "get_service_details",
+                "validate_service",
+                "get_scraper_status",
+            ),
+        ),
+    )
 
     runtime = MCPServerRuntime(
         settings=settings,
@@ -134,7 +151,17 @@ async def test_stdio_runtime_end_to_end(tmp_path):
 
         list_tools = await send({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         tool_names = {tool["name"] for tool in list_tools["result"]["tools"]}
-        assert "search_services" in tool_names
+        assert {"list_providers", "search_services"}.issubset(tool_names)
+
+        providers_listing = await send(
+            {
+                "jsonrpc": "2.0",
+                "id": 5,
+                "method": "tools/call",
+                "params": {"name": "list_providers", "arguments": {}},
+            }
+        )
+        assert providers_listing["result"]["structuredContent"]["providers"][0]["id"] == "service-public-bj"
 
         categories_msg = await send(
             {
@@ -160,6 +187,19 @@ async def test_stdio_runtime_end_to_end(tmp_path):
             }
         )
         assert search_msg["result"]["structuredContent"]["results"][0]["id"] == "PS001"
+
+        status_msg = await send(
+            {
+                "jsonrpc": "2.0",
+                "id": 6,
+                "method": "tools/call",
+                "params": {"name": "get_scraper_status", "arguments": {}},
+            }
+        )
+        assert (
+            status_msg["result"]["structuredContent"]["providers"][0]["provider_id"]
+            == "service-public-bj"
+        )
 
     finally:
         task.cancel()

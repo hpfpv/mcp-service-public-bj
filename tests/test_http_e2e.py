@@ -6,7 +6,7 @@ import pytest
 from server.config import Settings
 from server.main import MCPServerRuntime, build_http_app
 from server.models import Category, ServiceDetails, ServiceSummary
-from server.providers import ProviderRegistry
+from server.providers import ProviderDescriptor, ProviderRegistry
 from server.providers.base import BaseProvider
 from server.registry import RegistryState
 
@@ -114,7 +114,24 @@ async def test_http_endpoint_end_to_end(tmp_path):
     registry_state = RegistryState()
     store = DummyStore()
     registry = ProviderRegistry()
-    registry.register(StubProvider(settings, data))
+    stub_provider = StubProvider(settings, data)
+    registry.register(
+        stub_provider,
+        ProviderDescriptor(
+            id=stub_provider.provider_id,
+            name=stub_provider.display_name,
+            description="Stub provider for HTTP e2e tests",
+            priority=100,
+            coverage_tags=("test",),
+            supported_tools=(
+                "list_categories",
+                "search_services",
+                "get_service_details",
+                "validate_service",
+                "get_scraper_status",
+            ),
+        ),
+    )
 
     runtime = MCPServerRuntime(
         settings=settings,
@@ -163,7 +180,17 @@ async def test_http_endpoint_end_to_end(tmp_path):
             list_tools = await rpc({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
             assert "result" in list_tools, list_tools
             tool_names = {tool["name"] for tool in list_tools["result"]["tools"]}
-            assert {"list_categories", "search_services", "get_service_details", "get_scraper_status"}.issubset(tool_names)
+            assert {"list_providers", "list_categories", "search_services", "get_service_details", "get_scraper_status"}.issubset(tool_names)
+
+            providers_listing = await rpc(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 20,
+                    "method": "tools/call",
+                    "params": {"name": "list_providers", "arguments": {}},
+                }
+            )
+            assert providers_listing["result"]["structuredContent"]["providers"][0]["id"] == "service-public-bj"
 
             categories = await rpc(
                 {
@@ -217,7 +244,7 @@ async def test_http_endpoint_end_to_end(tmp_path):
             )
             assert "result" in status, status
             structured_status = status["result"]["structuredContent"]
-            assert structured_status["status"]["healthy"] is True
+            assert structured_status["providers"][0]["status"]["healthy"] is True
 
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver") as metrics_client:
             metrics_resp = await metrics_client.get("/metrics")

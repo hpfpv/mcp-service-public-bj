@@ -8,7 +8,13 @@ from pathlib import Path
 
 from .config import Settings
 from .health import ScraperHealthMonitor
-from .providers import ProviderInitialisationError, ProviderRegistry, ServicePublicBJProvider
+from .providers import (
+    FinancesBJProvider,
+    ProviderDescriptor,
+    ProviderInitialisationError,
+    ProviderRegistry,
+    ServicePublicBJProvider,
+)
 from .registry import RegistryState, RegistryStore
 
 logger = logging.getLogger(__name__)
@@ -37,9 +43,89 @@ async def initialise_providers(
                 registry_state=registry_state,
                 health_monitor=health_monitor,
             )
-            registry.register(provider)
+            descriptor = ProviderDescriptor(
+                id=provider.provider_id,
+                name="Service Public BJ",
+                description="Portail officiel service-public.bj pour les demarches administratives.",
+                priority=settings.provider_priorities.get(provider.provider_id, 100),
+                coverage_tags=(
+                    "administration",
+                    "etatcivil",
+                    "identite",
+                    "passeport",
+                    "famille",
+                    "naissance",
+                    "autorisations",
+                    "sejour",
+                    "visa",
+                    "certificat",
+                    "etat",
+                    "travail",
+                    "education",
+                    "sante",
+                    "sport",
+                    "logement",
+                    "justice",
+                    "transport",
+                    "urbanisme",
+                    "environnement",
+                    "culture",
+                    "social",
+                ),
+                supported_tools=(
+                    "list_categories",
+                    "search_services",
+                    "get_service_details",
+                    "validate_service",
+                    "get_scraper_status",
+                ),
+            )
+        elif provider_id == FinancesBJProvider.provider_id:
+            provider = FinancesBJProvider(
+                settings,
+                registry_state=registry_state,
+                health_monitor=health_monitor,
+            )
+            descriptor = ProviderDescriptor(
+                id=provider.provider_id,
+                name="Finances BJ",
+                description="Services numeriques du Ministere de l'Economie et des Finances (IFU, impots, foncier, entreprises).",
+                priority=settings.provider_priorities.get(provider.provider_id, 80),
+                coverage_tags=(
+                    "finances",
+                    "impots",
+                    "taxes",
+                    "tva",
+                    "ifu",
+                    "entreprise",
+                    "comptabilite",
+                    "banque",
+                    "budget",
+                    "tresor",
+                    "change",
+                    "credit",
+                    "emprunt",
+                    "remboursement",
+                    "douane",
+                    "commerce",
+                    "investissement",
+                    "foncier",
+                    "cadastre",
+                    "titrefoncier",
+                    "marchepublic",
+                    "retraite",
+                ),
+                supported_tools=(
+                    "list_categories",
+                    "search_services",
+                    "get_service_details",
+                    "validate_service",
+                    "get_scraper_status",
+                ),
+            )
         else:
             raise ProviderInitialisationError(f"Unknown provider id '{provider_id}' in configuration")
+        registry.register(provider, descriptor)
 
     await asyncio.gather(*(provider.initialise() for provider in registry.all()))
     return registry

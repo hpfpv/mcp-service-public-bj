@@ -9,7 +9,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential ca-certificates \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        libxml2-dev \
+        libxslt-dev \
+        libffi-dev \
+        zlib1g-dev \
+        libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md ./
@@ -28,7 +35,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MCP_SP_CACHE_DIR=/app/data/registry
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates tzdata \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        tzdata \
+        libxml2 \
+        libxslt1.1 \
+        libffi8 \
+        libssl3 \
+        zlib1g \
     && rm -rf /var/lib/apt/lists/* \
     && update-ca-certificates \
     && adduser --disabled-password --gecos "" --uid 1000 appuser
@@ -38,8 +52,7 @@ WORKDIR /app
 COPY --from=builder /tmp/wheels /wheels
 
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip \
-    && pip install --no-cache-dir --no-index --find-links=/wheels mcp-service-public-bj \
+    pip install --no-cache-dir --no-index --find-links=/wheels mcp-service-public-bj \
     && rm -rf /wheels
 
 COPY --from=builder /app/data ./data
@@ -51,3 +64,4 @@ USER appuser
 EXPOSE 8000
 
 ENTRYPOINT ["python3", "-m", "server.main"]
+CMD ["serve-http", "--host", "0.0.0.0", "--port", "8000"]
