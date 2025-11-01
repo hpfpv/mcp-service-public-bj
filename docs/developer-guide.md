@@ -330,10 +330,13 @@ To expose a new website via the MCP server:
   - Update `tests/test_http_e2e.py` and `tests/test_stdio_e2e.py` if the new provider changes default tool behavior.
 5. **Update documentation**: Describe the provider capabilities, rate limits, and any additional tools it introduces.
 
-Remember to update the Docker image if new dependencies are required; rebuild with:
+Remember to update the Docker image if new dependencies are required. For development, you can build locally or use the published image:
 
 ```bash
-python -m pip install build
+# Use published image (recommended)
+docker pull ghcr.io/hpfpv/mcp-service-public-bj:latest
+
+# Or build locally for development
 python -m build --wheel --outdir dist
 docker build \
   --build-arg WHEEL_FILE=$(ls dist/*py3-none-any.whl | head -n 1) \
@@ -468,16 +471,20 @@ async def call_mcp_tool():
 
 #### Development
 ```bash
-# Build image
+# Use published image (recommended)
+docker pull ghcr.io/hpfpv/mcp-service-public-bj:latest
+
+# Run stdio mode with volume for persistence
+docker run --rm -i ghcr.io/hpfpv/mcp-service-public-bj:latest serve
+
+# Run HTTP mode for development
+docker run --rm -p 8000:8000 ghcr.io/hpfpv/mcp-service-public-bj:latest
+
+# Or build locally for development
 python -m build --wheel --outdir dist
 docker build \
   --build-arg WHEEL_FILE=$(ls dist/*py3-none-any.whl | head -n 1) \
   -t mcp-service-public-bj .
-
-# Run stdio mode with volume for persistence
-docker run --rm -i \
-  -v $(pwd)/data:/app/data \
-  ghcr.io/hpfpv/mcp-service-public-bj:latest serve
 ```
 
 #### Production
