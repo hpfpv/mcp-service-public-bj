@@ -1,0 +1,42 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'docs/**', 'README.md', 'src/**/*.py' ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+    
+    - name: Install dependencies
+      run: |
+        pip install -e .
+        pip install mkdocs mkdocs-material mkdocstrings[python]
+    
+    - name: Build docs
+      run: mkdocs build
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
+    
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: 'site'
+    
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2

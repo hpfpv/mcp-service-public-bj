@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+    
+    - name: Lint with ruff
+      run: ruff check src tests
+    
+    - name: Type check with mypy
+      run: mypy src
+    
+    - name: Test with pytest
+      run: pytest --cov=src --cov-report=xml
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+    
+    - name: Install bandit
+      run: pip install bandit[toml]
+    
+    - name: Security scan
+      run: bandit -r src -f json -o bandit-report.json
+    
+    - name: Upload security report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-report
+        path: bandit-report.json
+
+  docker-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Build test image
+      run: |
+        python -m pip install build
+        python -m build --wheel --outdir dist
+        docker build --build-arg WHEEL_FILE=$(ls dist/*py3-none-any.whl | head -n 1) -t test-image .
+    
+    - name: Test container
+      run: |
+        timeout 10s docker run --rm test-image --help || [ $? -eq 124 ]
