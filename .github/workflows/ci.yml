@@ -14,7 +14,7 @@ jobs:
         python-version: ["3.10", "3.11", "3.12"]
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
@@ -36,15 +36,15 @@ jobs:
       run: PYTHONPATH=src pytest --cov=src --cov-report=xml
     
     - name: Upload coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
         file: ./coverage.xml
 
   security:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
+    - uses: actions/checkout@v5
+    - uses: actions/setup-python@v6
       with:
         python-version: "3.11"
     
@@ -64,7 +64,7 @@ jobs:
   docker-test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Build test image
       run: |

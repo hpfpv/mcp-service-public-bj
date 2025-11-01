@@ -7,7 +7,7 @@ import time
 from urllib.parse import urljoin
 
 import httpx
-from aiocache import Cache
+from aiocache import Cache  # type: ignore[import-untyped]
 
 from .config import Settings
 from .health import ScraperHealthMonitor

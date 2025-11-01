@@ -99,7 +99,7 @@ SERVICE_SUMMARY_SCHEMA = {
 SERVICE_DETAILS_SCHEMA = {
     "type": "object",
     "properties": {
-        **SERVICE_SUMMARY_SCHEMA["properties"],
+        **SERVICE_SUMMARY_SCHEMA["properties"],  # type: ignore[misc]
         "summary": {"type": ["string", "null"]},
         "last_updated": {"type": ["string", "null"], "format": "date-time"},
         "steps": {"type": "array", "items": STEP_SCHEMA},
