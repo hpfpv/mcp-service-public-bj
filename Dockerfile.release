@@ -25,9 +25,9 @@ RUN apt-get update \
 ARG WHEEL_FILE
 RUN test -n "$WHEEL_FILE"
 
-COPY ${WHEEL_FILE} /tmp/app.whl
-RUN pip install --no-cache-dir /tmp/app.whl \
-    && rm -f /tmp/app.whl
+COPY ${WHEEL_FILE} /tmp/
+RUN pip install --no-cache-dir /tmp/*.whl \
+    && rm -f /tmp/*.whl
 
 COPY data ./data
 RUN chown -R appuser:appuser /app

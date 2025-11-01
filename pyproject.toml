@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-service-public-bj"
-version = "0.1.0"
+version = "0.0.1"
 description = "MCP server exposing Benin public service information via live scraping of service-public.bj."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-  { name = "MCP Service Public BJ Maintainers" }
+  { name = "@hpfpv }
 ]
 dependencies = [
   "scrapy>=2.11.1",
