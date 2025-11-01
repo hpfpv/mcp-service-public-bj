@@ -330,7 +330,15 @@ To expose a new website via the MCP server:
   - Update `tests/test_http_e2e.py` and `tests/test_stdio_e2e.py` if the new provider changes default tool behavior.
 5. **Update documentation**: Describe the provider capabilities, rate limits, and any additional tools it introduces.
 
-Remember to update the Docker image if new dependencies are required; rebuild with `docker build -t mcp-service-public-bj .`.
+Remember to update the Docker image if new dependencies are required; rebuild with:
+
+```bash
+python -m pip install build
+python -m build --wheel --outdir dist
+docker build \
+  --build-arg WHEEL_FILE=$(ls dist/*py3-none-any.whl | head -n 1) \
+  -t mcp-service-public-bj .
+```
 
 ## Integration Patterns
 
@@ -459,7 +467,10 @@ async def call_mcp_tool():
 #### Development
 ```bash
 # Build image
-docker build -t mcp-service-public-bj .
+python -m build --wheel --outdir dist
+docker build \
+  --build-arg WHEEL_FILE=$(ls dist/*py3-none-any.whl | head -n 1) \
+  -t mcp-service-public-bj .
 
 # Run with volume for persistence
 docker run --rm -i \
@@ -476,8 +487,7 @@ docker run -d \
   -e MCP_SP_CACHE_TTL=600 \
   -e MCP_SP_CONCURRENCY=4 \
   -v /opt/mcp-data:/app/data \
-  mcp-service-public-bj:latest \
-  serve-http --host 0.0.0.0
+  mcp-service-public-bj:latest
 ```
 
 ### TLS deployment (reverse proxy)

@@ -51,7 +51,10 @@ curl -X POST http://localhost:8000/mcp \
 kill $SERVER_PID
 
 # Docker testing
-docker build -t mcp-service-public-bj:test .
+python -m build --wheel --outdir dist
+docker build \
+  --build-arg WHEEL_FILE=$(ls dist/*py3-none-any.whl | head -n 1) \
+  -t mcp-service-public-bj:test .
 docker run --rm mcp-service-public-bj:test --help
 ```
 
@@ -76,41 +79,39 @@ git checkout -b release/X.Y.Z
 git push origin release/X.Y.Z
 ```
 
-#### 2. Build and Test
-```bash
-# Build Python package
-python -m build
-
-# Test installation
-pip install dist/mcp_service_public_bj-X.Y.Z-py3-none-any.whl
-mcp-service-public-bj --help
-
-# Build Docker image
-docker build -t mcp-service-public-bj:X.Y.Z .
-docker tag mcp-service-public-bj:X.Y.Z mcp-service-public-bj:latest
-```
-
-#### 3. Create GitHub Release
+#### 2. Push Release Tag (Triggers GitHub Actions work
 ```bash
 # Create and push tag
 git tag -a vX.Y.Z -m "Release version X.Y.Z"
 git push origin vX.Y.Z
-
-# Create GitHub release with changelog
-gh release create vX.Y.Z \
-  --title "Release X.Y.Z" \
-  --notes-file CHANGELOG.md \
-  dist/mcp_service_public_bj-X.Y.Z-py3-none-any.whl
 ```
 
-#### 4. Publish Packages
-```bash
-# Publish to PyPI (if configured)
-twine upload dist/*
+The [`release.yml`](../.github/workflows/release.yml) workflow will automatically:
 
-# Push Docker images (if registry configured)
-docker push your-registry/mcp-service-public-bj:X.Y.Z
-docker push your-registry/mcp-service-public-bj:latest
+1. Build Python source and binary distributions, including Linux wheels for x86_64 and aarch64 (via cibuildwheel)
+2. Generate build provenance attestations for every artifact
+3. Assemble SHA256 checksums and create a GitHub Release with auto-generated notes
+4. Build multi-platform Docker images (linux/amd64, linux/arm64) reusing the pre-built wheels, and push them to `ghcr.io/<org>/<repo>` with the following tags:
+   - Full semver (`X.Y.Z`)
+   - Minor stream (`X.Y`)
+   - Major stream (`X`)
+   - `latest`
+
+Monitor the workflow from the Actions tab. Once it completes successfully, verify the generated release and container images:
+
+```bash
+gh release view vX.Y.Z
+docker pull ghcr.io/<org>/<repo>:X.Y.Z
+```
+
+#### 3. (Optional) Manual Artifact Validation
+```bash
+# Download artifacts from the release if manual inspection is required
+gh release download vX.Y.Z --pattern "*"
+
+# Verify checksums
+cd vX.Y.Z
+sha256sum -c SHA256SUMS
 ```
 
 ## Deployment Strategies
@@ -145,7 +146,7 @@ mcp-service-public-bj serve-http --host 0.0.0.0 --port 8000
 #### Option 2: Docker Deployment
 ```bash
 # Pull image
-docker pull mcp-service-public-bj:latest
+docker pull ghcr.io/your-org/mcp-service-public-bj:latest
 
 # Run with environment file
 docker run -d \
@@ -154,8 +155,18 @@ docker run -d \
   -p 8000:8000 \
   --env-file .env \
   -v /opt/mcp-data:/app/data \
-  mcp-service-public-bj:latest \
-  serve-http --host 0.0.0.0
+  ghcr.io/your-org/mcp-service-public-bj:latest
+```
+
+##### Build image from source (if needed)
+```bash
+# Build wheel once
+python -m build --wheel --outdir dist
+
+# Build multi-arch image using the wheel
+docker build \
+  --build-arg WHEEL_FILE=$(ls dist/*py3-none-any.whl | head -n 1) \
+  -t ghcr.io/your-org/mcp-service-public-bj:dev .
 ```
 
 #### Option 3: Docker Compose

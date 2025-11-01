@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.6
 
-FROM python:3.11-slim
+FROM python:3.11-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -11,26 +11,26 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential \
         ca-certificates \
-        libxml2-dev \
-        libxslt-dev \
-        libffi-dev \
-        zlib1g-dev \
-        libssl-dev \
+        tzdata \
+        libxml2 \
+        libxslt1.1 \
+        libffi8 \
+        libssl3 \
+        zlib1g \
     && rm -rf /var/lib/apt/lists/* \
-    && update-ca-certificates
+    && update-ca-certificates \
+    && adduser --disabled-password --gecos "" --uid 1000 appuser
 
-COPY pyproject.toml README.md ./
-COPY src src
-COPY data data
+ARG WHEEL_FILE
+RUN test -n "$WHEEL_FILE"
 
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip \
-    && pip install .
+COPY ${WHEEL_FILE} /tmp/app.whl
+RUN pip install --no-cache-dir /tmp/app.whl \
+    && rm -f /tmp/app.whl
 
-RUN adduser --disabled-password --gecos "" --uid 1000 appuser \
-    && chown -R appuser:appuser /app
+COPY data ./data
+RUN chown -R appuser:appuser /app
 
 USER appuser
 

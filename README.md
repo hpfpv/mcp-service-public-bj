@@ -77,14 +77,18 @@ Add to `~/Library/Application Support/Code/User/mcp.json`:
 
 ### Docker
 ```bash
-# Build
-docker build -t mcp-service-public-bj .
+# Build (requires pre-built wheel)
+python -m pip install build
+python -m build --wheel --outdir dist
+docker build \
+  --build-arg WHEEL_FILE=$(ls dist/*py3-none-any.whl | head -n 1) \
+  -t mcp-service-public-bj .
 
 # Run stdio mode
 docker run --rm -i mcp-service-public-bj
 
 # Run HTTP mode
-docker run --rm -p 8000:8000 mcp-service-public-bj serve-http --host 0.0.0.0
+docker run --rm -p 8000:8000 mcp-service-public-bj
 ```
 
 ## Available Tools
