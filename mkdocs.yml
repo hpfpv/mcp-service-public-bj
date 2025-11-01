@@ -1,0 +1,30 @@
+site_name: MCP Service Public BJ
+site_description: MCP server for Benin's public service information
+site_url: https://hpfpv.github.io/mcp-service-public-bj/
+repo_url: https://github.com/hpfpv/mcp-service-public-bj
+repo_name: hpfpv/mcp-service-public-bj
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: blue
+      accent: blue
+
+nav:
+  - Home: index.md
+  - Developer Guide: developer-guide.md
+  - Release Guide: release-guide.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
