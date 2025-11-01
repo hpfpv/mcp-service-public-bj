@@ -80,11 +80,11 @@ Add to `~/Library/Application Support/Code/User/mcp.json`:
 # Pull from GitHub Container Registry
 docker pull ghcr.io/hpfpv/mcp-service-public-bj:latest
 
-# Run stdio mode
-docker run --rm -i ghcr.io/hpfpv/mcp-service-public-bj:latest
+# Run HTTP mode (default)
+docker run --rm -p 8000:8000 ghcr.io/hpfpv/mcp-service-public-bj:latest
 
-# Run HTTP mode
-docker run --rm -p 8000:8000 ghcr.io/hpfpv/mcp-service-public-bj:latest serve-http --host 0.0.0.0
+# Run stdio mode
+docker run --rm -i ghcr.io/hpfpv/mcp-service-public-bj:latest serve
 ```
 
 ## Available Tools

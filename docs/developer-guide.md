@@ -368,7 +368,8 @@ The server supports both **stdio** (single client) and **HTTP** (multi-client) t
       "command": "docker",
       "args": [
         "run", "--rm", "-i",
-        "ghcr.io/hpfpv/mcp-service-public-bj:latest"
+        "ghcr.io/hpfpv/mcp-service-public-bj:latest",
+        "serve"
       ]
     }
   }
@@ -399,7 +400,8 @@ The server supports both **stdio** (single client) and **HTTP** (multi-client) t
       "command": "docker",
       "args": [
         "run", "--rm", "-i",
-        "ghcr.io/hpfpv/mcp-service-public-bj:latest"
+        "ghcr.io/hpfpv/mcp-service-public-bj:latest",
+        "serve"
       ]
     }
   }
@@ -424,7 +426,7 @@ The server supports both **stdio** (single client) and **HTTP** (multi-client) t
 mcp-service-public-bj serve-http --host 0.0.0.0 --port 8000
 
 # Docker
-docker run -p 8000:8000 mcp-service-public-bj serve-http --host 0.0.0.0
+docker run -p 8000:8000 ghcr.io/hpfpv/mcp-service-public-bj:latest
 ```
 
 ### Transport Comparison
@@ -472,10 +474,10 @@ docker build \
   --build-arg WHEEL_FILE=$(ls dist/*py3-none-any.whl | head -n 1) \
   -t mcp-service-public-bj .
 
-# Run with volume for persistence
+# Run stdio mode with volume for persistence
 docker run --rm -i \
   -v $(pwd)/data:/app/data \
-  mcp-service-public-bj
+  ghcr.io/hpfpv/mcp-service-public-bj:latest serve
 ```
 
 #### Production
@@ -487,7 +489,7 @@ docker run -d \
   -e MCP_SP_CACHE_TTL=600 \
   -e MCP_SP_CONCURRENCY=4 \
   -v /opt/mcp-data:/app/data \
-  mcp-service-public-bj:latest
+  ghcr.io/hpfpv/mcp-service-public-bj:latest
 ```
 
 ### TLS deployment (reverse proxy)
