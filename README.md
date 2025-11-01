@@ -16,8 +16,9 @@ This server enables AI assistants to help citizens find information about Benine
 
 Here's how an AI assistant can help users find information about Beninese public services:
 
-![MCP Service Public BJ Example 1](images/mcp-example-1.png)
-![MCP Service Public BJ Example 2](images/mcp-example-2.png)
+![MCP Service Public BJ Example 1](docs/images/mcp-example-1.png)
+
+![MCP Service Public BJ Example 2](docs/images/mcp-example-2.png)
 
 *Example: AI assistant helping a user find information about passport renewal procedures using the MCP server*
 
