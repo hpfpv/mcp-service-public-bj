@@ -15,7 +15,7 @@ if False:  # pragma: no cover
 try:
     from typing import TYPE_CHECKING
 except ImportError:  # pragma: no cover
-    TYPE_CHECKING = False  # type: ignore[assignment]
+    TYPE_CHECKING = False
 
 if TYPE_CHECKING:
     from ..models import Category, ServiceDetails, ServiceSummary

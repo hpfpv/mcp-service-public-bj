@@ -117,7 +117,7 @@ def metrics_payload() -> tuple[bytes, str]:
     """Return the Prometheus metrics payload and content type."""
 
     _ensure_registry()
-    return generate_latest(_REGISTRY), CONTENT_TYPE_LATEST
+    return generate_latest(_REGISTRY or CollectorRegistry()), CONTENT_TYPE_LATEST
 
 
 def reset_metrics_for_tests() -> None:  # pragma: no cover - test utility

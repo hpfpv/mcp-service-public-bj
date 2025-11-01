@@ -143,7 +143,7 @@ async def _search_services_single(
         results = await provider.search_services(
             query,
             category_id=category_id,
-            limit=requested_limit,
+            limit=requested_limit or 10,
             offset=offset,
             refresh=refresh,
         )
