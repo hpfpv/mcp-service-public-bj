@@ -32,7 +32,7 @@ Here's how an AI assistant can help users find information about Beninese public
 
 ```bash
 # Clone and setup
-git clone <repository-url>
+git clone https://github.com/hpfpv/mcp-service-public-bj.git
 cd mcp-service-public-bj
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate

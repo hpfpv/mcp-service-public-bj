@@ -88,7 +88,7 @@ prometheus-client>=0.20.0
 ### 1. Environment Setup
 ```bash
 # Clone repository
-git clone <repository-url>
+git clone https://github.com/hpfpv/mcp-service-public-bj.git
 cd mcp-service-public-bj
 
 # Create virtual environment

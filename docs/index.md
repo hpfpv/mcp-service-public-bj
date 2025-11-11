@@ -22,7 +22,7 @@ This server enables AI assistants to help citizens find information about Benine
 
 ```bash
 # Clone and setup
-git clone <repository-url>
+git clone https://github.com/hpfpv/mcp-service-public-bj.git
 cd mcp-service-public-bj
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
